@@ -1,9 +1,38 @@
 [package]
-name = "blizz"
+name = "extrablatt"
 version = "0.1.0"
 authors = ["Matthias Seitz <matthias.seitz@tum.de>"]
 edition = "2018"
+repository = "https://github.com/MattsSe/extrablatt"
+categories = ["parsing"]
+keywords = ["parser", "web", "news"]
+description= "News, articles and text scraper"
+documentation = "https://docs.rs/extrablatt/"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[badges]
+travis-ci = { repository = "mattsse/extrablatt", branch = "master" }
 
 [dependencies]
+structopt = { version = "0.2", optional = true }
+serde = { version="1.0", features = ["derive"] }
+serde_json = "1.0"
+select = { git = "https://github.com/utkarshkukreti/select.rs" }
+anyhow = "1.0"
+log = "0.4"
+tokio = "=0.2.0-alpha.6"
+thiserror = "1.0"
+reqwest = "=0.10.0-alpha.2"
+diesel = { version = "1.4", optional = true }
+archiveis = { version = "0.3", optional = true }
+regex = "1.3"
+rss = "1.8"
+lazy_static = "1.4"
+chrono = "0.4"
+uri = "0.3"
+dtparse = "1.0"
+wasm-timer = "0.2"
+
+[features]
+cli = ["structopt"]
+db = ["diesel"]
+archive = ["archiveis"]
