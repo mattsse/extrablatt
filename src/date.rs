@@ -1,9 +1,11 @@
-use chrono::prelude::*;
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-use lazy_static::lazy_static;
-use select::node::Node;
 use std::borrow::Cow;
 use std::collections::HashMap;
+
+use chrono::prelude::*;
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use select::node::Node;
+
+use lazy_static::lazy_static;
 
 pub struct MetaTag<'a> {
     /// The name of the attribute that holds the `value`
@@ -115,10 +117,12 @@ impl DateExtractor {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::collections::HashMap;
+
     use chrono::prelude::*;
     use dtparse::Parser;
-    use std::collections::HashMap;
+
+    use super::*;
 
     #[test]
     fn parse_dates() {}

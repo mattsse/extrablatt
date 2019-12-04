@@ -1,3 +1,4 @@
+use std::slice::Iter;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -31,6 +32,38 @@ pub enum Language {
 }
 
 impl Language {
+    /// All known languages.
+    pub fn languages() -> Iter<'static, Language> {
+        static LANGUAGES: [Language; 25] = [
+            Language::Arabic,
+            Language::Russian,
+            Language::Dutch,
+            Language::German,
+            Language::English,
+            Language::Spanish,
+            Language::French,
+            Language::Hebrew,
+            Language::Italian,
+            Language::Korean,
+            Language::Norwegian,
+            Language::Persian,
+            Language::Polish,
+            Language::Portuguese,
+            Language::Swedish,
+            Language::Hungarian,
+            Language::Finnish,
+            Language::Danish,
+            Language::Chinese,
+            Language::Indonesian,
+            Language::Vietnamese,
+            Language::Swahili,
+            Language::Turkish,
+            Language::Greek,
+            Language::Ukrainian,
+        ];
+        LANGUAGES.into_iter()
+    }
+
     pub fn identifier(&self) -> &str {
         match self {
             Language::Arabic => "ar",
@@ -97,32 +130,38 @@ impl Language {
 impl<T: AsRef<str>> From<T> for Language {
     fn from(s: T) -> Self {
         match s.as_ref() {
-            "ar" => Language::Arabic,
-            "ru" => Language::Russian,
-            "nl" => Language::Dutch,
-            "de" => Language::German,
-            "en" => Language::English,
-            "es" => Language::Spanish,
-            "fr" => Language::French,
-            "he" => Language::Hebrew,
-            "it" => Language::Italian,
-            "ko" => Language::Korean,
-            "no" => Language::Norwegian,
-            "fa" => Language::Persian,
-            "pl" => Language::Polish,
-            "pt" => Language::Portuguese,
-            "sv" => Language::Swedish,
-            "hu" => Language::Hungarian,
-            "fi" => Language::Finnish,
-            "da" => Language::Danish,
-            "zh" => Language::Chinese,
-            "id" => Language::Indonesian,
-            "vi" => Language::Vietnamese,
-            "sw" => Language::Swahili,
-            "tr" => Language::Turkish,
-            "el" => Language::Greek,
-            "uk" => Language::Ukrainian,
+            "ar" | "arabic" => Language::Arabic,
+            "ru" | "russian" => Language::Russian,
+            "nl" | "dutch" => Language::Dutch,
+            "de" | "german" => Language::German,
+            "en" | "english" => Language::English,
+            "es" | "spanish" => Language::Spanish,
+            "fr" | "french" => Language::French,
+            "he" | "hebrew" => Language::Hebrew,
+            "it" | "italian" => Language::Italian,
+            "ko" | "korean" => Language::Korean,
+            "no" | "norwegian" => Language::Norwegian,
+            "fa" | "persian" => Language::Persian,
+            "pl" | "polish" => Language::Polish,
+            "pt" | "portuguese" => Language::Portuguese,
+            "sv" | "swedish" => Language::Swedish,
+            "hu" | "hungarian" => Language::Hungarian,
+            "fi" | "finnish" => Language::Finnish,
+            "da" | "danish" => Language::Danish,
+            "zh" | "chinese" => Language::Chinese,
+            "id" | "indonesian" => Language::Indonesian,
+            "vi" | "vietnamese" => Language::Vietnamese,
+            "sw" | "swahili" => Language::Swahili,
+            "tr" | "turkish" => Language::Turkish,
+            "el" | "greek" => Language::Greek,
+            "uk" | "ukrainian" => Language::Ukrainian,
             s => Language::Other(s.to_string()),
         }
+    }
+}
+
+impl Default for Language {
+    fn default() -> Self {
+        Language::English
     }
 }

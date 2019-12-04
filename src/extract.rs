@@ -1,23 +1,36 @@
-use crate::date::ArticleDate;
+use std::borrow::Cow;
+use std::collections::HashSet;
+
+use log::{debug, info};
 use reqwest::Url;
 use select::document::Document;
-use uri::Uri;
+use select::predicate::Name;
+use url::Host;
 
-pub trait Extractor {
+use crate::date::ArticleDate;
+use crate::newspaper::Category;
+use crate::stopwords::CATEGORY_STOPWORDS;
+use crate::Language;
+
+pub trait Extractor: Sized {
     /// Extract the article title and analyze it.
-    fn title(&self, doc: &Document) -> Option<String>;
+    fn title(&self, doc: &Document) -> Option<String> {
+        unimplemented!()
+    }
 
     /// Extract all the listed authors for the article.
-    fn authors(&self, doc: &Document) -> Option<Vec<String>>;
+    fn authors(&self, doc: &Document) -> Option<Vec<String>> {
+        unimplemented!()
+    }
 
     /// When the article was published (and last updated).
     fn publishing_date(&self, url: &Url, doc: &Document) -> Option<ArticleDate>;
 
     /// Extract the favicon from a website.
-    fn favicon(&self, doc: &Document) -> Option<Uri>;
+    fn favicon(&self, doc: &Document) -> Option<Url>;
 
     /// Extract content language from meta tag.
-    fn meta_lang(&self, doc: &Document) -> Option<String> {
+    fn meta_lang(&self, doc: &Document) -> Option<Language> {
         unimplemented!()
     }
 
@@ -49,16 +62,25 @@ pub trait Extractor {
     }
 
     /// Extract all of urls of the document.
-    fn urls(&self, doc: &Document) -> Option<Vec<Url>> {
-        unimplemented!()
+    fn urls<'a>(&self, doc: &'a Document) -> Vec<Cow<'a, str>> {
+        doc.find(Name("a"))
+            .filter_map(|n| n.attr("href"))
+            .map(Cow::Borrowed)
+            .collect()
     }
 
     /// Extract all of the images of the document.
-    fn img_urls(&self, doc: &Document) -> Option<Vec<Url>> {
-        unimplemented!()
+    fn img_urls<'a>(&self, doc: &'a Document) -> Vec<Cow<'a, str>> {
+        doc.find(Name("img"))
+            .filter_map(|n| n.attr("href"))
+            .map(Cow::Borrowed)
+            .collect()
     }
 
-    fn category_urls(&self, url: &Url, doc: &Document) -> Option<Vec<String>>;
+    /// Finds all of the top level urls, assuming that these are the category
+    /// urls.
+    // TODO change api to supply base url?
+    fn category_urls(&self, doc: &Document) -> Vec<Category>;
 
     ///  Return the article's canonical URL
     ///
@@ -70,22 +92,24 @@ pub trait Extractor {
     }
 }
 
-pub struct DefaultExtractor {}
+#[derive(Debug)]
+pub struct DefaultExtractor {
+    /// Base url of the newspaper.
+    base_url: Url,
+}
+
+impl DefaultExtractor {
+    pub fn new(base_url: Url) -> Self {
+        Self { base_url }
+    }
+}
 
 impl Extractor for DefaultExtractor {
-    fn title(&self, doc: &Document) -> Option<String> {
-        unimplemented!()
-    }
-
-    fn authors(&self, doc: &Document) -> Option<Vec<String>> {
-        unimplemented!()
-    }
-
     fn publishing_date(&self, url: &Url, doc: &Document) -> Option<ArticleDate> {
         unimplemented!()
     }
 
-    fn favicon(&self, doc: &Document) -> Option<Uri> {
+    fn favicon(&self, doc: &Document) -> Option<Url> {
         unimplemented!()
     }
 
@@ -93,7 +117,92 @@ impl Extractor for DefaultExtractor {
         unimplemented!()
     }
 
-    fn category_urls(&self, url: &Url, doc: &Document) -> Option<Vec<String>> {
-        unimplemented!()
+    fn category_urls(&self, doc: &Document) -> Vec<Category> {
+        let options = Url::options();
+        let base_url = options.base_url(Some(&self.base_url));
+        let base_subdomains = self
+            .base_url
+            .domain()
+            .map(|x| x.split('.').collect::<Vec<_>>());
+        let candidates = self.urls(doc);
+
+        let mut category_urls = Vec::new();
+
+        for url in candidates {
+            if url.starts_with('#') {
+                debug!("Ignoring category url starting with '#': {:?}", url);
+                continue;
+            }
+
+            match base_url.parse(&*url) {
+                Ok(url) => {
+                    if url.scheme() != self.base_url.scheme() {
+                        debug!(
+                            "Ignoring category url {:?} with unexpected scheme. Expected: {}, got: {} ",
+                            url,
+                            url.scheme(),
+                            self.base_url.scheme()
+                        );
+                        continue;
+                    }
+
+                    // check for subdomains
+                    if let Some(Host::Domain(domain)) = url.host() {
+                        if let Some(parent_domains) = &base_subdomains {
+                            let candidate_domains: Vec<_> = domain.split('.').collect();
+
+                            if parent_domains.iter().all(|d| candidate_domains.contains(d)) {
+                                // check for mobile
+                                if candidate_domains.iter().any(|d| *d == "m" || *d == "i") {
+                                    debug!("Ignoring category url for mobile subdomain: {:?}", url);
+                                } else {
+                                    if candidate_domains
+                                        .iter()
+                                        .any(|d| CATEGORY_STOPWORDS.contains(d))
+                                    {
+                                        debug!("Ignoring category url {:?} for containing a blacklisted subdomain.", url);
+                                    } else {
+                                        category_urls.push(url);
+                                    }
+                                }
+                            } else {
+                                debug!("Ignoring category url due to base url domain mismatch. Expected subdomain for {:?}, got: {:?}", self.base_url.domain(), url.domain());
+                            }
+                        } else {
+                            debug!("Ignoring category url due to base url domain mismatch. Expected Host::Domain, got: {:?}",url.host());
+                        }
+                    } else {
+                        // check host equality
+                        if self.base_url.host() == url.host() {
+                            category_urls.push(url);
+                        }
+                    }
+                }
+                Err(e) => {
+                    debug!("Ignoring category {:?}: {:?}", url, e);
+                }
+            }
+        }
+
+        let category_urls: HashSet<_> = category_urls
+            .into_iter()
+            .filter(|candidate| {
+                if let Some(segments) = candidate.path_segments() {
+                    segments
+                        .filter(|s| !CATEGORY_STOPWORDS.contains(s) && *s != "index.html")
+                        .count()
+                        == 1
+                } else {
+                    false
+                }
+            })
+            .map(|mut url| {
+                url.set_query(None);
+
+                url
+            })
+            .collect();
+
+        category_urls.into_iter().map(Category::new).collect()
     }
 }

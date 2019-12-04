@@ -1,11 +1,84 @@
-use crate::language::Language;
-use anyhow::Result;
-use lazy_static::lazy_static;
 use std::collections::HashSet;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::ops::Deref;
 use std::path::Path;
+
+use anyhow::Result;
+
+use lazy_static::lazy_static;
+
+use crate::language::Language;
+
+pub(crate) const CATEGORY_STOPWORDS: [&'static str; 67] = [
+    "about",
+    "help",
+    "privacy",
+    "legal",
+    "feedback",
+    "sitemap",
+    "sitemap.html",
+    "profile",
+    "account",
+    "mobile",
+    "facebook",
+    "myspace",
+    "twitter",
+    "linkedin",
+    "bebo",
+    "friendster",
+    "stumbleupon",
+    "youtube",
+    "vimeo",
+    "store",
+    "mail",
+    "preferences",
+    "maps",
+    "password",
+    "imgur",
+    "flickr",
+    "search",
+    "subscription",
+    "itunes",
+    "siteindex",
+    "events",
+    "stop",
+    "jobs",
+    "careers",
+    "newsletter",
+    "subscribe",
+    "academy",
+    "shopping",
+    "purchase",
+    "site-map",
+    "sitemap",
+    "shop",
+    "donate",
+    "newsletter",
+    "product",
+    "advert",
+    "info",
+    "tickets",
+    "coupons",
+    "forum",
+    "board",
+    "archive",
+    "browse",
+    "howto",
+    "how to",
+    "faq",
+    "terms",
+    "charts",
+    "services",
+    "contact",
+    "plus",
+    "admin",
+    "login",
+    "signup",
+    "register",
+    "developer",
+    "proxy",
+];
 
 macro_rules! stop_words {
     ($($name:ident $lang:tt,)*) => {
