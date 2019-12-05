@@ -33,7 +33,7 @@ pub enum Language {
 
 impl Language {
     /// All known languages.
-    pub fn languages() -> Iter<'static, Language> {
+    pub fn known_languages() -> Iter<'static, Language> {
         static LANGUAGES: [Language; 25] = [
             Language::Arabic,
             Language::Russian,
@@ -127,35 +127,37 @@ impl Language {
     }
 }
 
-impl<T: AsRef<str>> From<T> for Language {
-    fn from(s: T) -> Self {
+impl FromStr for Language {
+    type Err = Language;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.as_ref() {
-            "ar" | "arabic" => Language::Arabic,
-            "ru" | "russian" => Language::Russian,
-            "nl" | "dutch" => Language::Dutch,
-            "de" | "german" => Language::German,
-            "en" | "english" => Language::English,
-            "es" | "spanish" => Language::Spanish,
-            "fr" | "french" => Language::French,
-            "he" | "hebrew" => Language::Hebrew,
-            "it" | "italian" => Language::Italian,
-            "ko" | "korean" => Language::Korean,
-            "no" | "norwegian" => Language::Norwegian,
-            "fa" | "persian" => Language::Persian,
-            "pl" | "polish" => Language::Polish,
-            "pt" | "portuguese" => Language::Portuguese,
-            "sv" | "swedish" => Language::Swedish,
-            "hu" | "hungarian" => Language::Hungarian,
-            "fi" | "finnish" => Language::Finnish,
-            "da" | "danish" => Language::Danish,
-            "zh" | "chinese" => Language::Chinese,
-            "id" | "indonesian" => Language::Indonesian,
-            "vi" | "vietnamese" => Language::Vietnamese,
-            "sw" | "swahili" => Language::Swahili,
-            "tr" | "turkish" => Language::Turkish,
-            "el" | "greek" => Language::Greek,
-            "uk" | "ukrainian" => Language::Ukrainian,
-            s => Language::Other(s.to_string()),
+            "ar" | "arabic" => Ok(Language::Arabic),
+            "ru" | "russian" => Ok(Language::Russian),
+            "nl" | "dutch" => Ok(Language::Dutch),
+            "de" | "german" => Ok(Language::German),
+            "en" | "english" => Ok(Language::English),
+            "es" | "spanish" => Ok(Language::Spanish),
+            "fr" | "french" => Ok(Language::French),
+            "he" | "hebrew" => Ok(Language::Hebrew),
+            "it" | "italian" => Ok(Language::Italian),
+            "ko" | "korean" => Ok(Language::Korean),
+            "no" | "norwegian" => Ok(Language::Norwegian),
+            "fa" | "persian" => Ok(Language::Persian),
+            "pl" | "polish" => Ok(Language::Polish),
+            "pt" | "portuguese" => Ok(Language::Portuguese),
+            "sv" | "swedish" => Ok(Language::Swedish),
+            "hu" | "hungarian" => Ok(Language::Hungarian),
+            "fi" | "finnish" => Ok(Language::Finnish),
+            "da" | "danish" => Ok(Language::Danish),
+            "zh" | "chinese" => Ok(Language::Chinese),
+            "id" | "indonesian" => Ok(Language::Indonesian),
+            "vi" | "vietnamese" => Ok(Language::Vietnamese),
+            "sw" | "swahili" => Ok(Language::Swahili),
+            "tr" | "turkish" => Ok(Language::Turkish),
+            "el" | "greek" => Ok(Language::Greek),
+            "uk" | "ukrainian" => Ok(Language::Ukrainian),
+            s => Err(Language::Other(s.to_string())),
         }
     }
 }

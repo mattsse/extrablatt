@@ -12,6 +12,52 @@ use crate::extract::{DefaultExtractor, Extractor};
 use crate::language::Language;
 use crate::newspaper::Config;
 
+pub const GOOD_SEGMENTS: [&'static str; 13] = [
+    "story",
+    "article",
+    "feature",
+    "featured",
+    "slides",
+    "slideshow",
+    "gallery",
+    "news",
+    "video",
+    "media",
+    "v",
+    "radio",
+    "press",
+];
+
+pub const BAD_SEGMENTS: [&'static str; 17] = [
+    "careers",
+    "contact",
+    "about",
+    "faq",
+    "terms",
+    "privacy",
+    "advert",
+    "preferences",
+    "feedback",
+    "info",
+    "browse",
+    "howto",
+    "account",
+    "subscribe",
+    "donate",
+    "shop",
+    "admin",
+];
+
+pub const BAD_DOMAINS: [&'static str; 4] = ["amazon", "doubleclick", "twitter", "outbrain"];
+
+#[derive(Debug, Clone)]
+pub struct ArticleUrl<'a> {
+    /// The url of the article.
+    pub url: Url,
+    /// The title of the article.
+    pub title: Option<Cow<'a, str>>,
+}
+
 #[derive(Debug)]
 pub struct Article {
     /// The url of the article.

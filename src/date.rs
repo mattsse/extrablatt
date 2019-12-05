@@ -1,62 +1,74 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
+use crate::extract::NodeValueQuery;
 use chrono::prelude::*;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-use select::node::Node;
-
 use lazy_static::lazy_static;
-
-pub struct MetaTag<'a> {
-    /// The name of the attribute that holds the `value`
-    attribute: Cow<'a, str>,
-    /// Value of the `attribute` to check against.
-    value: Cow<'a, str>,
-    /// The name of the attribute that holds the requested value.
-    content: Cow<'a, str>,
-}
-impl<'a> MetaTag<'a> {
-    pub fn from_str(attribute: &'a str, value: &'a str, content: &'a str) -> MetaTag<'a> {
-        MetaTag {
-            attribute: Cow::Borrowed(attribute),
-            value: Cow::Borrowed(value),
-            content: Cow::Borrowed(content),
-        }
-    }
-}
+use regex::Regex;
+use select::document::Document;
+use select::node::Node;
+use select::predicate::{Attr, Name, Predicate};
 
 lazy_static! {
-    /// Common `<meta>` tags that hold the article's publishing date.
-    ///
-    /// For a [`MetaTag::from_str("property", "pubdate", "content")`] tag, the str value of the
-    /// publishing date would be expected to be located in the `content` attribute of the following
-    /// meta tag `<meta property="pubdate", content="2019-12-03T15:19:31.282Z">`
-    ///
-    static ref  PUBLISH_DATE_META_TAGS: Vec<MetaTag<'static>> = {
-            let mut tags = Vec::with_capacity(11);
-            tags.push(MetaTag::from_str( "property",  "rnews:datePublished",
+
+    static ref RE_KEY_VALUE_PUBLISH_DATE: Regex = Regex::new(r#"(?mi)"\s*(([^"]|\w)*)?(date[-_\s]?(Published|created)|Pub(lish|lication)?[-_\s]?Date)\s*"\s*[:=]\s*"\s*(?P<date>[^"]*)\s*""#).unwrap();
+
+    static ref RE_KEY_VALUE_MODIFIED_DATE: Regex = Regex::new(r#"(?mi)"\s*(([^"]|\w)*)?((date[\s_-]?modified|modified[\s_-]?date))\s*"\s*[:=]\s*"\s*(?P<date>[^"]*)\s*""#).unwrap();
+
+    /// Common nodes that hold the article's modification date.
+    static ref  MODIFIED_DATE_NODES: Vec<NodeValueQuery<'static>> = {
+            let mut nodes = Vec::with_capacity(7);
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("property",  "article:modified"),
              "content"));
-            tags.push(MetaTag::from_str( "property",  "article:published_time",
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("property",  "modified"),
              "content"));
-            tags.push(MetaTag::from_str( "name",  "OriginalPublicationDate",
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("name",  "ModificationDate"),
              "content"));
-            tags.push(MetaTag::from_str( "itemprop",  "datePublished",
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("name",  "modification_date"),
+             "content"));
+             nodes.push(NodeValueQuery::new( Name("meta"), Attr("name",  "lastmod"),
+             "content"));
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("itemprop",  "dateModified"),
              "datetime"));
-            tags.push(MetaTag::from_str( "property",  "og:published_time",
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("name",  "dateModified"),
              "content"));
-            tags.push(MetaTag::from_str( "name",  "article_date_original",
+             nodes
+        };
+
+
+    /// Common nodes that hold the article's publishing date.
+    static ref  PUBLISH_DATE_NODES: Vec<NodeValueQuery<'static>> = {
+            let mut nodes = Vec::with_capacity(12);
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("property",  "rnews:datePublished"),
              "content"));
-            tags.push(MetaTag::from_str( "name",  "publication_date",
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("property",  "article:published_time"),
              "content"));
-            tags.push(MetaTag::from_str( "name",  "sailthru.date",
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("name",  "OriginalPublicationDate"),
              "content"));
-            tags.push(MetaTag::from_str( "name",  "PublishDate",
-             "content"));
-            tags.push(MetaTag::from_str( "pubdate",  "pubdate",
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("itemprop",  "datePublished"),
              "datetime"));
-            tags.push(MetaTag::from_str( "name",  "publish_date",
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("property",  "og:published_time"),
              "content"));
-             tags
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("name",  "article_date_original"),
+             "content"));
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("name",  "publication_date"),
+             "content"));
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("name",  "sailthru.date"),
+             "content"));
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("name",  "PublishDate"),
+             "content"));
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("name",  "pubdate"),
+             "content"));
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("pubdate",  "pubdate"),
+             "datetime"));
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("name",  "publish_date"),
+             "content"));
+
+            nodes.push(NodeValueQuery::new( Name("div"), Attr("id",  "taboola-feed-below-article"),
+             "data-publishdate"));
+
+             nodes
         };
 }
 
@@ -89,15 +101,67 @@ pub struct ArticleDate {
 pub struct DateExtractor;
 
 impl DateExtractor {
-    /// Extract the dates using the `<meta>` tags of the head node.
-    fn extract_from_head(head: Node) -> Option<ArticleDate> {
-        unimplemented!()
+    /// Extract the date from the document using several options:
+    ///
+    /// 1. Look in the common `<meta>` nodes.
+    /// 2. Regex the `<head>` node
+    pub fn from_doc(doc: &Document) -> Option<ArticleDate> {
+        if let Some(published) =
+            DateExtractor::extract_date(doc, &PUBLISH_DATE_NODES, &RE_KEY_VALUE_PUBLISH_DATE)
+        {
+            let last_updated = DateExtractor::extract_date(
+                &doc,
+                &MODIFIED_DATE_NODES,
+                &RE_KEY_VALUE_MODIFIED_DATE,
+            )
+            .map(|date| Update::DateTime(date));
+            return Some(ArticleDate {
+                published: Date::DateTime(published),
+                last_updated,
+            });
+        }
+        None
     }
 
-    /// Extract the publishing timestamp from plain text using fuzzy option of
-    /// `dateparse` for now.
-    // TODO needs propper parsing impl that handles also updates
-    fn extract_from_text(s: &str) -> Option<ArticleDate> {
+    fn extract_date<'a>(
+        doc: &Document,
+        nodes: &[NodeValueQuery<'a>],
+        regex: &Regex,
+    ) -> Option<NaiveDateTime> {
+        let mut date = {
+            for node in nodes {
+                if let Some(content) = doc
+                    .find(node.name.and(node.attr))
+                    .filter_map(|n| n.attr(node.content_name))
+                    .next()
+                {
+                    if let Some(date) = DateExtractor::fuzzy_dtparse(content) {
+                        return Some(date);
+                    }
+                }
+            }
+            None
+        };
+
+        if date.is_none() {
+            // look for a "publicationDate":"2019..." in the doc str
+            if let Some(head) = doc
+                .find(Name("head"))
+                .filter_map(|head| head.as_text())
+                .next()
+            {
+                if let Some(capture) = regex.captures(head) {
+                    date = capture
+                        .name("date")
+                        .and_then(|m| DateExtractor::fuzzy_dtparse(m.as_str()))
+                }
+            }
+        }
+
+        date
+    }
+
+    fn fuzzy_dtparse(s: &str) -> Option<NaiveDateTime> {
         let mut tzinfod = HashMap::new();
         tzinfod.insert("ET".to_string(), 14400);
         let parser = dtparse::Parser::default();
@@ -107,23 +171,43 @@ impl DateExtractor {
                 true, /* gives us the tokens that weren't recognized */
                 None, false, &tzinfod,
             )
+            .map(|(date, _, _)| date)
             .ok()
-            .map(|(published, _, _)| ArticleDate {
-                published: Date::DateTime(published),
-                last_updated: None,
-            })
+    }
+
+    /// Extract the publishing timestamp from plain text using fuzzy searching
+    /// with `dtparse`.
+    pub fn from_str(s: &str) -> Option<ArticleDate> {
+        DateExtractor::fuzzy_dtparse(s).map(|published| ArticleDate {
+            published: Date::DateTime(published),
+            last_updated: None,
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
-
-    use chrono::prelude::*;
-    use dtparse::Parser;
-
     use super::*;
 
     #[test]
-    fn parse_dates() {}
+    fn date_modified() {
+        let caps = RE_KEY_VALUE_MODIFIED_DATE
+            .captures(r#""datemodified":"2019-12-05T15:34:34+0100""#)
+            .unwrap();
+        assert_eq!(
+            caps.name("date").unwrap().as_str(),
+            "2019-12-05T15:34:34+0100"
+        )
+    }
+
+    #[test]
+    fn publish_modified() {
+        let caps = RE_KEY_VALUE_PUBLISH_DATE
+            .captures(r#""datePublished":"2019-12-05T15:34:34+0100""#)
+            .unwrap();
+        assert_eq!(
+            caps.name("date").unwrap().as_str(),
+            "2019-12-05T15:34:34+0100"
+        )
+    }
 }

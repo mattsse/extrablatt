@@ -27,7 +27,7 @@ pub struct Newspaper<TExtractor: Extractor = DefaultExtractor> {
     /// The parsed main page.
     pub main_page: Document,
     /// Url of the main page.
-    base_url: Url,
+    pub base_url: Url,
     /// The [`extrablatt::Extractor`] used for content retrieval.
     ///
     /// Default is [`extrablatt::DefaultExtractor`].
@@ -53,6 +53,7 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
         self.categories.clear()
     }
 
+    /// Refresh the main page for the newspaper and returns the old document.
     pub async fn refresh_homepage(&mut self) -> Result<Document> {
         let main_page = Newspaper::get_document(
             self.base_url.clone(),
@@ -157,8 +158,7 @@ impl NewspaperBuilder {
             .base_url
             .clone()
             .context("Url of the article must be initialized.")?;
-        self.build_with_extractor(DefaultExtractor::new(base_url))
-            .await
+        self.build_with_extractor(Default::default()).await
     }
 }
 
@@ -207,7 +207,7 @@ impl Category {
     }
 
     pub fn language_hint(&self) -> Option<Language> {
-        for lang in Language::languages() {
+        for lang in Language::known_languages() {
             let full_name = lang.full_name().to_lowercase();
             let id = lang.identifier();
             if let Some(domain) = &self.url.domain() {
