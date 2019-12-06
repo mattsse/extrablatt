@@ -68,6 +68,29 @@ impl<'a> ArticleUrl<'a> {
     pub fn new(url: Url, title: Option<Cow<'a, str>>) -> Self {
         Self { url, title }
     }
+
+    /// If the article is related heavily to media: gallery, video, big
+    /// pictures, etc
+    pub fn is_media_news(&self) -> bool {
+        if let Some(segments) = self.url.path_segments() {
+            let media_segemnts = &[
+                "video",
+                "slide",
+                "gallery",
+                "powerpoint",
+                "fashion",
+                "glamour",
+                "cloth",
+                "graphics",
+            ];
+            for segment in segments.filter(|s| s.len() < 11) {
+                if media_segemnts.contains(&segment.to_lowercase().as_str()) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
 }
 
 #[derive(Debug)]
@@ -88,7 +111,7 @@ impl Article {
         ArticleBuilder::new(url)
     }
 
-    pub fn extract<T: Extractor>(&self, extractor: &T) -> Result<ArticleInfo> {
+    pub fn extract<T: Extractor>(&self, extractor: &T) -> Result<ArticleContent> {
         unimplemented!()
     }
 }
@@ -165,19 +188,105 @@ impl ArticleBuilder {
     }
 }
 
-#[derive(Debug)]
-pub struct ArticleInfo {
-    pub authors: Option<Vec<String>>,
-    pub title: Option<String>,
+#[derive(Debug, Clone)]
+pub struct ArticleContent<'a> {
+    pub authors: Option<Vec<Cow<'a, str>>>,
+    pub title: Option<Cow<'a, str>>,
     pub date: Option<ArticleDate>,
-    pub keywords: Option<Vec<String>>,
-    pub summary: Option<String>,
-    pub text: Option<String>,
-    pub html: Option<String>,
-    pub url: Url,
-    pub language: Language,
+    pub keywords: Option<Vec<Cow<'a, str>>>,
+    pub summary: Option<Cow<'a, str>>,
+    pub text: Option<Cow<'a, str>>,
+    pub language: Option<Language>,
     pub thumbnail: Option<Url>,
     pub top_image: Option<Url>,
     pub images: Option<Vec<Url>>,
     pub videos: Option<Vec<Url>>,
+}
+
+#[derive(Debug, Default)]
+pub struct ArticleContentBuilder<'a> {
+    pub authors: Option<Vec<Cow<'a, str>>>,
+    pub title: Option<Cow<'a, str>>,
+    pub date: Option<ArticleDate>,
+    pub keywords: Option<Vec<Cow<'a, str>>>,
+    pub summary: Option<Cow<'a, str>>,
+    pub text: Option<Cow<'a, str>>,
+    pub language: Option<Language>,
+    pub thumbnail: Option<Url>,
+    pub top_image: Option<Url>,
+    pub images: Option<Vec<Url>>,
+    pub videos: Option<Vec<Url>>,
+}
+
+impl<'a> ArticleContentBuilder<'a> {
+    pub fn authors(mut self, authors: Vec<Cow<'a, str>>) -> Self {
+        self.authors = Some(authors);
+        self
+    }
+
+    pub fn title(mut self, title: Cow<'a, str>) -> Self {
+        self.title = Some(title);
+        self
+    }
+
+    pub fn date(mut self, date: ArticleDate) -> Self {
+        self.date = Some(date);
+        self
+    }
+
+    pub fn keywords(mut self, keywords: Vec<Cow<'a, str>>) -> Self {
+        self.keywords = Some(keywords);
+        self
+    }
+
+    pub fn summary(mut self, summary: Cow<'a, str>) -> Self {
+        self.summary = Some(summary);
+        self
+    }
+
+    pub fn text(mut self, text: Cow<'a, str>) -> Self {
+        self.text = Some(text);
+        self
+    }
+
+    pub fn language(mut self, language: Language) -> Self {
+        self.language = Some(language);
+        self
+    }
+
+    pub fn thumbnail(mut self, thumbnail: Url) -> Self {
+        self.thumbnail = Some(thumbnail);
+        self
+    }
+
+    pub fn top_image(mut self, top_image: Url) -> Self {
+        self.top_image = Some(top_image);
+        self
+    }
+
+    pub fn images(mut self, images: Vec<Url>) -> Self {
+        self.images = Some(images);
+        self
+    }
+
+    pub fn videos(mut self, videos: Vec<Url>) -> Self {
+        self.videos = Some(videos);
+        self
+    }
+
+    pub fn build(self) -> ArticleContent<'a> {
+        ArticleContent {
+            authors: self.authors,
+            title: self.title,
+            date: self.date,
+            keywords: self.keywords,
+            summary: self.summary,
+            text: self.text,
+            language: self.language,
+            thumbnail: self.thumbnail,
+            top_image: self.top_image,
+            images: self.images,
+            videos: self.videos,
+        }
+    }
 }

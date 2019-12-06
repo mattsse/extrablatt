@@ -4,9 +4,11 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use fnv::{FnvHashMap, FnvHashSet};
-use lru::LruCache;
-use reqwest::Body;
+use futures::future::join_all;
+use futures::FutureExt;
+use futures::stream::{FuturesUnordered, Stream};
 use reqwest::{Client, ClientBuilder, IntoUrl, StatusCode, Url};
+use reqwest::Body;
 use select::document::Document;
 use wasm_timer::Instant;
 
@@ -33,9 +35,9 @@ pub struct Newspaper<TExtractor: Extractor = DefaultExtractor> {
     /// Default is [`extrablatt::DefaultExtractor`].
     pub extractor: TExtractor,
     /// Cache for retrieved articles.
-    article_cache: FnvHashMap<Url, DocumentState>,
+    article_cache: FnvHashMap<Url, DocumentDownloadState>,
     /// All known categories for this newspaper.
-    categories: FnvHashMap<Category, DocumentState>,
+    categories: FnvHashMap<Category, DocumentDownloadState>,
     /// Configuration for article extraction.
     config: Config,
 }
@@ -44,13 +46,59 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
     /// Convenience method for creating a new [`NewspaperBuilder`]
     ///
     /// Same as calling [`NewspaperBuilder::new`]
+    #[inline]
     pub fn builder<T: IntoUrl>(url: T) -> Result<NewspaperBuilder> {
         NewspaperBuilder::new(url)
     }
 
+    #[inline]
     pub fn clear(&mut self) {
         self.article_cache.clear();
         self.categories.clear()
+    }
+
+    #[inline]
+    pub fn categories(&self) -> impl Iterator<Item = &Category> {
+        self.categories.keys()
+    }
+
+    fn insert_new_categories(&mut self) {
+        for category in self.extractor.categories(&self.main_page, &self.base_url) {
+            if !self.categories.contains_key(&category) {
+                self.categories
+                    .insert(category, DocumentDownloadState::NotRequested);
+            }
+        }
+    }
+
+    async fn extract_articles(&mut self) -> Result<Vec<()>> {
+        // join all futures
+        let futures: Vec<_> = self
+            .categories
+            .iter()
+            .filter(|(_, state)| state.is_not_requested())
+            .map(|(cat, _)| {
+                self.client
+                    .get(cat.url.clone())
+                    .send()
+                    .then(move |res| futures::future::ok::<_, ()>((cat, res, Instant::now())))
+            })
+            .collect();
+
+        for (cat, resp, time) in join_all(futures).await.into_iter().filter_map(|res| {
+            if let Ok(r) = res {
+                Some(r)
+            } else {
+                None
+            }
+        }) {
+            // TODO update the documentstate based in response
+            // 1. match resp --> insert in categories
+        }
+
+        // TODO what to return here? just the &Category as Result or also the Document
+        // state which would require additional hashmap lookups
+        Ok(vec![])
     }
 
     /// Refresh the main page for the newspaper and returns the old document.
@@ -61,6 +109,9 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
             self.config.http_success_only,
         )
         .await?;
+
+        // extract all categories
+        self.insert_new_categories();
 
         Ok(std::mem::replace(&mut self.main_page, main_page))
     }
@@ -138,7 +189,7 @@ impl NewspaperBuilder {
         let main_page =
             Newspaper::get_document(base_url.clone(), &client, config.http_success_only).await?;
 
-        Ok(Newspaper {
+        let mut paper = Newspaper {
             client,
             language: self.language.unwrap_or_default(),
             main_page,
@@ -150,7 +201,11 @@ impl NewspaperBuilder {
                 Default::default(),
             ),
             config,
-        })
+        };
+
+        paper.insert_new_categories();
+
+        Ok(paper)
     }
 
     pub async fn build(self) -> Result<Newspaper> {
@@ -163,9 +218,9 @@ impl NewspaperBuilder {
 }
 
 #[derive(Debug, Clone)]
-pub enum DocumentState {
-    //    /// No request sent yet.
-    //    PendingRequest,
+pub enum DocumentDownloadState {
+    /// No request sent yet.
+    NotRequested,
     //    /// Waiting for a response for request sent at `started`
     //    PendingResponse {
     //        /// Timestamp the request was sent.
@@ -188,12 +243,48 @@ pub enum DocumentState {
     },
     /// Received a success response at `received` but failed to parse the `body`
     /// into a [`select::Document`]
-    HtmlFailure {
+    DocumentReadFailure {
         /// Timestamp the response was received.
         received: Instant,
         /// Payload of the response.
         body: Bytes,
     },
+}
+
+impl DocumentDownloadState {
+    pub fn is_http_failure(&self) -> bool {
+        match self {
+            DocumentDownloadState::HttpFailure { .. } => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_doc_parsing_failure(&self) -> bool {
+        match self {
+            DocumentDownloadState::DocumentReadFailure { .. } => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_not_requested(&self) -> bool {
+        match self {
+            DocumentDownloadState::NotRequested { .. } => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_success(&self) -> bool {
+        match self {
+            DocumentDownloadState::Success { .. } => true,
+            _ => false,
+        }
+    }
+}
+
+impl Default for DocumentDownloadState {
+    fn default() -> Self {
+        DocumentDownloadState::NotRequested
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

@@ -1,14 +1,16 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use crate::extract::NodeValueQuery;
-use chrono::prelude::*;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-use lazy_static::lazy_static;
+use chrono::prelude::*;
 use regex::Regex;
 use select::document::Document;
 use select::node::Node;
 use select::predicate::{Attr, Name, Predicate};
+
+use lazy_static::lazy_static;
+
+use crate::extract::NodeValueQuery;
 
 lazy_static! {
 

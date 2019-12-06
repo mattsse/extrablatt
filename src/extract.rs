@@ -1,25 +1,33 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::path::Path;
+use std::str::FromStr;
 
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use log::{debug, info};
+use regex::Regex;
 use reqwest::Url;
 use select::document::Document;
 use select::node::Node;
 use select::predicate::{Attr, Name, Predicate};
 use url::Host;
 
-use crate::article::{ArticleUrl, ALLOWED_FILE_EXT, BAD_DOMAINS, BAD_SEGMENTS, GOOD_SEGMENTS};
+use lazy_static::lazy_static;
+
+use crate::article::{
+    ALLOWED_FILE_EXT,
+    ArticleContent,
+    ArticleUrl,
+    BAD_DOMAINS,
+    BAD_SEGMENTS,
+    GOOD_SEGMENTS,
+};
 use crate::date::{ArticleDate, DateExtractor, RE_DATE_SEGMENTS_M_D_Y, RE_DATE_SEGMENTS_Y_M_D};
 use crate::error::ExtrablattError;
+use crate::Language;
 use crate::newspaper::Category;
 use crate::stopwords::CATEGORY_STOPWORDS;
-use crate::Language;
-use lazy_static::lazy_static;
-use regex::Regex;
-use std::path::Path;
-use std::str::FromStr;
 
 lazy_static! {
     /// Regex for cleaning author names.
@@ -479,6 +487,10 @@ pub trait Extractor {
             .map(Category::new)
             .filter(|cat| Self::is_category(cat, base_url))
             .collect()
+    }
+
+    fn article_content<'a>(&self, doc: &'a Document) -> ArticleContent<'a> {
+        unimplemented!()
     }
 
     ///  Return the article's canonical URL
