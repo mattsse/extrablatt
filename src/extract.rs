@@ -12,6 +12,7 @@ use url::Host;
 
 use crate::article::ArticleUrl;
 use crate::date::{ArticleDate, DateExtractor};
+use crate::error::ExtrablattError;
 use crate::newspaper::Category;
 use crate::stopwords::CATEGORY_STOPWORDS;
 use crate::Language;
@@ -318,12 +319,53 @@ pub trait Extractor {
             .collect()
     }
 
+    fn is_article(article: &ArticleUrl, base_url: &Url) -> bool {
+        unimplemented!()
+    }
+
+    fn is_category(category: &Category, base_url: &Url) -> bool {
+        if category.url.as_str().starts_with('#') {
+            debug!(
+                "Ignoring category url starting with '#': {:?}",
+                category.url
+            );
+            return false;
+        }
+
+        if let Some(segments) = category.url.path_segments() {
+            for (i, segment) in segments.enumerate() {
+                if i > 0 {
+                    return false;
+                }
+                if CATEGORY_STOPWORDS.contains(&segment) || segment == "index.html" {
+                    return false;
+                }
+            }
+        }
+
+        if category.url.scheme() != base_url.scheme() {
+            debug!(
+                "Ignoring category url {:?} with unexpected scheme. Expected: {}, got: {} ",
+                category.url,
+                category.url.scheme(),
+                base_url.scheme()
+            );
+            return false;
+        }
+
+        return is_valid_domain(&category.url, base_url);
+    }
+
+    /// We also filter out articles with a subdomain or first degree path on a
+    /// registered bad keyword.
     fn create_article_url<T: AsRef<str>>(base_url: &Url, path: T) -> anyhow::Result<Url> {
         let options = Url::options().base_url(Some(base_url));
 
         let url = path.as_ref();
         if url.starts_with('#') {
-            debug!("Ignoring url starting with '#': {:?}", url);
+            return Err(ExtrablattError::UrlError {
+                msg: format!("Can't create url for id : {}", url),
+            })?;
         }
 
         unimplemented!()
@@ -333,87 +375,21 @@ pub trait Extractor {
     /// urls.
     fn categories(&self, doc: &Document, base_url: &Url) -> Vec<Category> {
         let options = Url::options().base_url(Some(base_url));
-        let base_subdomains = base_url.domain().map(|x| x.split('.').collect::<Vec<_>>());
-        let candidates = self.all_urls(doc);
-
-        let mut category_urls = Vec::new();
-
-        for url in candidates {
-            if url.starts_with('#') {
-                debug!("Ignoring category url starting with '#': {:?}", url);
-                continue;
-            }
-
-            match options.parse(&*url) {
-                Ok(url) => {
-                    if url.scheme() != base_url.scheme() {
-                        debug!(
-                            "Ignoring category url {:?} with unexpected scheme. Expected: {}, got: {} ",
-                            url,
-                            url.scheme(),
-                            base_url.scheme()
-                        );
-                        continue;
-                    }
-
-                    // check for subdomains
-                    if let Some(Host::Domain(domain)) = url.host() {
-                        if let Some(parent_domains) = &base_subdomains {
-                            let candidate_domains: Vec<_> = domain.split('.').collect();
-
-                            if parent_domains.iter().all(|d| candidate_domains.contains(d)) {
-                                // check for mobile
-                                if candidate_domains.iter().any(|d| *d == "m" || *d == "i") {
-                                    debug!("Ignoring category url for mobile subdomain: {:?}", url);
-                                } else {
-                                    if candidate_domains
-                                        .iter()
-                                        .any(|d| CATEGORY_STOPWORDS.contains(d))
-                                    {
-                                        debug!("Ignoring category url {:?} for containing a blacklisted subdomain.", url);
-                                    } else {
-                                        category_urls.push(url);
-                                    }
-                                }
-                            } else {
-                                debug!("Ignoring category url due to base url domain mismatch. Expected subdomain for {:?}, got: {:?}", base_url.domain(), url.domain());
-                            }
-                        } else {
-                            debug!("Ignoring category url due to base url domain mismatch. Expected Host::Domain, got: {:?}",url.host());
-                        }
-                    } else {
-                        // check host equality
-                        if base_url.host() == url.host() {
-                            category_urls.push(url);
-                        }
-                    }
-                }
-                Err(e) => {
-                    debug!("Ignoring category {:?}: {:?}", url, e);
-                }
-            }
-        }
-
-        let category_urls: HashSet<_> = category_urls
+        let category_urls: HashSet<_> = self
+            .all_urls(doc)
             .into_iter()
-            .filter(|candidate| {
-                if let Some(segments) = candidate.path_segments() {
-                    segments
-                        .filter(|s| !CATEGORY_STOPWORDS.contains(s) && *s != "index.html")
-                        .count()
-                        == 1
-                } else {
-                    false
-                }
-            })
+            .filter_map(|url| options.parse(&*url).ok())
             .map(|mut url| {
                 url.set_query(None);
-
                 url
             })
             .collect();
 
-        category_urls.into_iter().map(Category::new).collect()
+        category_urls
+            .into_iter()
+            .map(Category::new)
+            .filter(|cat| Self::is_category(cat, base_url))
+            .collect()
     }
 
     ///  Return the article's canonical URL
@@ -436,6 +412,34 @@ pub trait Extractor {
 
         None
     }
+}
+
+pub fn is_valid_domain(url: &Url, base_url: &Url) -> bool {
+    // check for subdomains
+    if let Some(Host::Domain(domain)) = url.host() {
+        let base_subdomains = base_url.domain().map(|x| x.split('.').collect::<Vec<_>>());
+
+        if let Some(parent_domains) = &base_subdomains {
+            let candidate_domains: Vec<_> = domain.split('.').collect();
+
+            if parent_domains.iter().all(|d| candidate_domains.contains(d)) {
+                // check for mobile
+                if candidate_domains.iter().any(|d| *d == "m" || *d == "i") {
+                    return false;
+                }
+                if candidate_domains
+                    .iter()
+                    .all(|d| !CATEGORY_STOPWORDS.contains(d))
+                {
+                    return true;
+                }
+            }
+        }
+    } else {
+        // check host equality
+        return base_url.host() == url.host();
+    }
+    false
 }
 
 #[derive(Debug, Default)]
