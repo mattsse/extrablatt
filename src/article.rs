@@ -12,7 +12,11 @@ use crate::extract::{DefaultExtractor, Extractor};
 use crate::language::Language;
 use crate::newspaper::Config;
 
-pub const GOOD_SEGMENTS: [&'static str; 13] = [
+pub const ALLOWED_FILE_EXT: [&'static str; 12] = [
+    "html", "htm", "md", "rst", "aspx", "jsp", "rhtml", "cgi", "xhtml", "jhtml", "asp", "shtml",
+];
+
+pub const GOOD_SEGMENTS: [&'static str; 15] = [
     "story",
     "article",
     "feature",
@@ -26,6 +30,8 @@ pub const GOOD_SEGMENTS: [&'static str; 13] = [
     "v",
     "radio",
     "press",
+    "graphics",
+    "investigations",
 ];
 
 pub const BAD_SEGMENTS: [&'static str; 17] = [
@@ -56,6 +62,12 @@ pub struct ArticleUrl<'a> {
     pub url: Url,
     /// The title of the article.
     pub title: Option<Cow<'a, str>>,
+}
+
+impl<'a> ArticleUrl<'a> {
+    pub fn new(url: Url, title: Option<Cow<'a, str>>) -> Self {
+        Self { url, title }
+    }
 }
 
 #[derive(Debug)]

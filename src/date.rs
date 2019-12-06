@@ -12,12 +12,16 @@ use select::predicate::{Attr, Name, Predicate};
 
 lazy_static! {
 
-    static ref RE_KEY_VALUE_PUBLISH_DATE: Regex = Regex::new(r#"(?mi)"\s*(([^"]|\w)*)?(date[-_\s]?(Published|created)|Pub(lish|lication)?[-_\s]?Date)\s*"\s*[:=]\s*"\s*(?P<date>[^"]*)\s*""#).unwrap();
+    pub(crate) static ref RE_DATE_SEGMENTS_Y_M_D: Regex = Regex::new(r"(?mi)(19|20)\d\d[-\\/\.](0[1-9]|1[012]|([jfmasond]\w{2,7}))[-\\/\.](0[1-9]|[12][0-9]|3[01])").unwrap();
 
-    static ref RE_KEY_VALUE_MODIFIED_DATE: Regex = Regex::new(r#"(?mi)"\s*(([^"]|\w)*)?((date[\s_-]?modified|modified[\s_-]?date))\s*"\s*[:=]\s*"\s*(?P<date>[^"]*)\s*""#).unwrap();
+    pub(crate) static ref RE_DATE_SEGMENTS_M_D_Y: Regex = Regex::new(r"(?mi)(0[1-9]|1[012]|([jfmasond]\w{2,7}))[-\\/\.](0[1-9]|[12][0-9]|3[01])[-\\/\.](19|20)\d\d").unwrap();
+
+    pub(crate) static ref RE_KEY_VALUE_PUBLISH_DATE: Regex = Regex::new(r#"(?mi)"\s*(([^"]|\w)*)?(date[-_\s]?(Published|created)|Pub(lish|lication)?[-_\s]?Date)\s*"\s*[:=]\s*"\s*(?P<date>[^"]*)\s*""#).unwrap();
+
+    pub(crate) static ref RE_KEY_VALUE_MODIFIED_DATE: Regex = Regex::new(r#"(?mi)"\s*(([^"]|\w)*)?((date[\s_-]?modified|modified[\s_-]?date))\s*"\s*[:=]\s*"\s*(?P<date>[^"]*)\s*""#).unwrap();
 
     /// Common nodes that hold the article's modification date.
-    static ref  MODIFIED_DATE_NODES: Vec<NodeValueQuery<'static>> = {
+    pub(crate) static ref  MODIFIED_DATE_NODES: Vec<NodeValueQuery<'static>> = {
             let mut nodes = Vec::with_capacity(7);
             nodes.push(NodeValueQuery::new( Name("meta"), Attr("property",  "article:modified"),
              "content"));
@@ -38,7 +42,7 @@ lazy_static! {
 
 
     /// Common nodes that hold the article's publishing date.
-    static ref  PUBLISH_DATE_NODES: Vec<NodeValueQuery<'static>> = {
+    pub(crate) static ref  PUBLISH_DATE_NODES: Vec<NodeValueQuery<'static>> = {
             let mut nodes = Vec::with_capacity(12);
             nodes.push(NodeValueQuery::new( Name("meta"), Attr("property",  "rnews:datePublished"),
              "content"));

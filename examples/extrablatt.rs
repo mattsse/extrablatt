@@ -12,7 +12,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let categories = newspaper
         .extractor
-        .category_urls(&newspaper.main_page, &newspaper.base_url);
+        .categories(&newspaper.main_page, &newspaper.base_url);
 
     dbg!(categories);
 

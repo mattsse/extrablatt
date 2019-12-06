@@ -10,14 +10,15 @@ use select::node::Node;
 use select::predicate::{Attr, Name, Predicate};
 use url::Host;
 
-use crate::article::ArticleUrl;
-use crate::date::{ArticleDate, DateExtractor};
+use crate::article::{ArticleUrl, ALLOWED_FILE_EXT, BAD_DOMAINS, BAD_SEGMENTS, GOOD_SEGMENTS};
+use crate::date::{ArticleDate, DateExtractor, RE_DATE_SEGMENTS_M_D_Y, RE_DATE_SEGMENTS_Y_M_D};
 use crate::error::ExtrablattError;
 use crate::newspaper::Category;
 use crate::stopwords::CATEGORY_STOPWORDS;
 use crate::Language;
 use lazy_static::lazy_static;
 use regex::Regex;
+use std::path::Path;
 use std::str::FromStr;
 
 lazy_static! {
@@ -36,6 +37,7 @@ pub(crate) struct NodeValueQuery<'a> {
     /// The name of the attribute that holds the requested value.
     pub content_name: &'a str,
 }
+
 impl<'a> NodeValueQuery<'a> {
     pub fn new(
         name: Name<&'a str>,
@@ -97,9 +99,6 @@ impl<'a> MetaNode<'a> {
 }
 
 pub trait Extractor {
-    // TODO this should contain a type Document, the implement the defaultextractor
-    // with type select::Document
-
     /// Extract the article title.
     ///
     /// Assumptions:
@@ -304,11 +303,13 @@ pub trait Extractor {
                 }
             })
             .filter_map(|(link, title)| {
-                // TODO concat for article links
-                Some(link)
-            });
-
-        unimplemented!()
+                options
+                    .parse(link)
+                    .map(|url| ArticleUrl::new(url, title.map(Cow::Borrowed)))
+                    .ok()
+            })
+            .filter(|article| Self::is_article(article, base_url))
+            .collect()
     }
 
     /// Extract all of the images of the document.
@@ -319,8 +320,111 @@ pub trait Extractor {
             .collect()
     }
 
+    /// First, perform basic format and domain checks like making sure the
+    /// format of the url.
+    ///
+    ///
+    /// We also filter out articles with a subdomain or first degree path on a
+    /// registered bad keyword.
     fn is_article(article: &ArticleUrl, base_url: &Url) -> bool {
-        unimplemented!()
+        if article.url.path().starts_with('#') {
+            return false;
+        }
+        if !is_valid_domain(&article.url, base_url) {
+            debug!("No valid article domain {:?}", article.url.domain());
+            return false;
+        }
+        let mut path_segments = Vec::new();
+        if let Some(segments) = article.url.path_segments() {
+            for segment in segments {
+                let segment = segment.to_lowercase().to_lowercase();
+                if BAD_SEGMENTS.contains(&segment.as_str()) {
+                    debug!("Bad segment in article path {:?}", article.url.domain());
+                    return false;
+                }
+                if !segment.is_empty() {
+                    path_segments.push(segment);
+                }
+            }
+
+            if path_segments.is_empty() {
+                return false;
+            }
+
+            let last_segment = path_segments.remove(path_segments.len() - 1);
+
+            // check file extensions
+            let mut iter = last_segment.rsplitn(2, '.');
+            let after = iter.next();
+            if let Some(segment) = iter.next() {
+                let extension = after.unwrap().to_lowercase();
+                if ALLOWED_FILE_EXT.contains(&extension.as_str()) {
+                    // assumption that the article slug is also the filename like `some-title.html`
+                    if segment.len() > 10 {
+                        path_segments.push(segment.to_string());
+                    }
+                } else {
+                    if extension.chars().all(char::is_numeric) {
+                        // prevents false negatives for articles with a trailing id like `1.343234`
+                        path_segments.push(last_segment);
+                    } else {
+                        debug!(
+                            "Encountered blacklisted filetype {} on article {:?}",
+                            last_segment, article.url
+                        );
+                        return false;
+                    }
+                }
+            } else {
+                path_segments.push(last_segment);
+            }
+        } else {
+            debug!("Article url has no path segments: {:?}", article.url);
+            return false;
+        }
+
+        // check if the url has a news slug title
+        if let Some(last_segment) = path_segments.last() {
+            let (dash_count, underscore_count) = count_dashes_and_underscores(last_segment);
+
+            if dash_count > 4 || underscore_count > 4 {
+                if let Some(Host::Domain(domain)) = article.url.host() {
+                    if let Some(domain) = domain.split('.').rev().skip(1).next() {
+                        let delim = if underscore_count > dash_count {
+                            '_'
+                        } else {
+                            '-'
+                        };
+                        if last_segment.split(delim).all(|s| s != domain) {
+                            return true;
+                        }
+                    } else {
+                        return true;
+                    }
+                } else {
+                    return true;
+                }
+            }
+        }
+
+        // check fo dates
+        if RE_DATE_SEGMENTS_Y_M_D.is_match(article.url.path()) {
+            return true;
+        }
+        if RE_DATE_SEGMENTS_M_D_Y.is_match(article.url.path()) {
+            return true;
+        }
+
+        // allow good paths
+        if path_segments.len() > 1 {
+            for segment in path_segments.iter() {
+                if GOOD_SEGMENTS.contains(&segment.as_str()) {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 
     fn is_category(category: &Category, base_url: &Url) -> bool {
@@ -354,21 +458,6 @@ pub trait Extractor {
         }
 
         return is_valid_domain(&category.url, base_url);
-    }
-
-    /// We also filter out articles with a subdomain or first degree path on a
-    /// registered bad keyword.
-    fn create_article_url<T: AsRef<str>>(base_url: &Url, path: T) -> anyhow::Result<Url> {
-        let options = Url::options().base_url(Some(base_url));
-
-        let url = path.as_ref();
-        if url.starts_with('#') {
-            return Err(ExtrablattError::UrlError {
-                msg: format!("Can't create url for id : {}", url),
-            })?;
-        }
-
-        unimplemented!()
     }
 
     /// Finds all of the top level urls, assuming that these are the category
@@ -414,6 +503,27 @@ pub trait Extractor {
     }
 }
 
+pub fn count_dashes_and_underscores<T: AsRef<str>>(s: T) -> (usize, usize) {
+    let s = s.as_ref();
+    let dash_count = s.chars().fold(0, |mut dashes, c| {
+        if c == '-' {
+            dashes += 1;
+        }
+        dashes
+    });
+
+    let underscore_count = s.chars().fold(0, |mut dashes, c| {
+        if c == '_' {
+            dashes += 1;
+        }
+        dashes
+    });
+
+    (dash_count, underscore_count)
+}
+
+/// Checks whether the `url`'s domain contains at least the `base_url` domain as
+/// a subdomain.
 pub fn is_valid_domain(url: &Url, base_url: &Url) -> bool {
     // check for subdomains
     if let Some(Host::Domain(domain)) = url.host() {
@@ -429,7 +539,7 @@ pub fn is_valid_domain(url: &Url, base_url: &Url) -> bool {
                 }
                 if candidate_domains
                     .iter()
-                    .all(|d| !CATEGORY_STOPWORDS.contains(d))
+                    .all(|d| !CATEGORY_STOPWORDS.contains(d) && !BAD_DOMAINS.contains(d))
                 {
                     return true;
                 }
@@ -487,5 +597,29 @@ mod tests {
             .name("name")
             .unwrap();
         assert_eq!(m.as_str(), "J\'oseph-Kelley");
+    }
+
+    #[test]
+    fn detect_articles() {
+        macro_rules! assert_articles {
+            ($base:expr => $($url:expr,)*) => {
+                let base_url = Url::parse($base).unwrap();
+                $(
+                    let article = ArticleUrl::new(Url::parse($url).unwrap(), None);
+                    assert!(DefaultExtractor::is_article(&article, &base_url));
+                )*
+            };
+        }
+
+        assert_articles!(
+               "https://extrablatt.com" =>
+               "https://extrablatt.com/politics/live-news/some-title-12-05-2019/index.html",
+               "https://extrablatt.com/2019/12/04/us/politics/some-title.html",
+               "https://extrablatt.com/2019/12/04/us/politics/some-title.html",
+               "https://www.extrablatt.com/graphics/2019/investigations/some-title/",
+               "https://extrablatt.com/2019/12/06/uk/some-longer-title-with-dashes/index.html",
+               "https://www.extrablatt.com/politik/some-longer-title-with-dashes-interview-1.347823?reduced=true",
+               "https://www.extrablatt.com/auto/some_longer_title_with_underscores_1300105.html",
+        );
     }
 }
