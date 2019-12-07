@@ -5,10 +5,11 @@ use std::time::Duration;
 use bytes::Bytes;
 use fnv::{FnvHashMap, FnvHashSet};
 use futures::future::join_all;
-use futures::FutureExt;
 use futures::stream::{FuturesUnordered, Stream};
+use futures::FutureExt;
+use reqwest::header::{HeaderMap, USER_AGENT};
+use reqwest::{Body, Error, Response};
 use reqwest::{Client, ClientBuilder, IntoUrl, StatusCode, Url};
-use reqwest::Body;
 use select::document::Document;
 use wasm_timer::Instant;
 
@@ -18,6 +19,7 @@ use crate::article::Article;
 use crate::error::ExtrablattError;
 use crate::extract::{DefaultExtractor, Extractor};
 use crate::language::Language;
+use crate::newspaper::DocumentDownloadState::DocumentReadFailure;
 use crate::storage::ArticleStore;
 
 #[derive(Debug)]
@@ -71,34 +73,62 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
         }
     }
 
-    async fn extract_articles(&mut self) -> Result<Vec<()>> {
+    pub async fn get_categories(&mut self) -> Result<Vec<(Category, &DocumentDownloadState)>> {
         // join all futures
         let futures: Vec<_> = self
             .categories
             .iter()
             .filter(|(_, state)| state.is_not_requested())
-            .map(|(cat, _)| {
+            .map(|(cat, state)| {
+                let cat = cat.clone();
                 self.client
                     .get(cat.url.clone())
                     .send()
-                    .then(move |res| futures::future::ok::<_, ()>((cat, res, Instant::now())))
+                    .then(|res| futures::future::ok::<_, ()>((cat, res, Instant::now())))
             })
             .collect();
 
-        for (cat, resp, time) in join_all(futures).await.into_iter().filter_map(|res| {
-            if let Ok(r) = res {
-                Some(r)
-            } else {
-                None
-            }
-        }) {
-            // TODO update the documentstate based in response
-            // 1. match resp --> insert in categories
+        let mut requested_categories = Vec::with_capacity(futures.len());
+
+        // save to unwrap since all responses are wrapped in an `Ok`.
+        for (cat, resp, received) in join_all(futures)
+            .await
+            .into_iter()
+            .map(std::result::Result::unwrap)
+        {
+            match resp {
+                Ok(resp) => {
+                    let state = self.categories.get_mut(&cat).unwrap();
+                    match resp.bytes().await {
+                        Ok(body) => {
+                            if let Ok(doc) = Document::from_read(&*body) {
+                                *state = DocumentDownloadState::Success { received, doc };
+                            } else {
+                                *state =
+                                    DocumentDownloadState::DocumentReadFailure { received, body };
+                            }
+                        }
+                        Err(error) => {
+                            *state = DocumentDownloadState::HttpFailure { received, error };
+                        }
+                    }
+                }
+                Err(error) => {
+                    let state = self.categories.get_mut(&cat).unwrap();
+                    *state = DocumentDownloadState::HttpFailure { received, error };
+                }
+            };
+
+            requested_categories.push(cat);
         }
 
-        // TODO what to return here? just the &Category as Result or also the Document
-        // state which would require additional hashmap lookups
-        Ok(vec![])
+        let mut res = Vec::with_capacity(requested_categories.len());
+        for cat in requested_categories {
+            let state = self.categories.get(&cat).unwrap();
+            res.push((cat, state))
+        }
+
+        Ok(res)
     }
 
     /// Refresh the main page for the newspaper and returns the old document.
@@ -123,7 +153,6 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
 }
 
 impl Newspaper {
-    /// TODO should return DocumentState
     pub(crate) async fn get_document(
         url: Url,
         client: &Client,
@@ -184,7 +213,21 @@ impl NewspaperBuilder {
         }
 
         let config = self.config.unwrap_or_default();
-        let client = Client::builder().timeout(config.request_timeout).build()?;
+
+        let mut headers = HeaderMap::with_capacity(1);
+
+        headers.insert(
+            USER_AGENT,
+            config.browser_user_agent.parse().context(format!(
+                "Failed to parse user agent header name: {}",
+                config.browser_user_agent
+            ))?,
+        );
+
+        let client = Client::builder()
+            .default_headers(headers)
+            .timeout(config.request_timeout)
+            .build()?;
 
         let main_page =
             Newspaper::get_document(base_url.clone(), &client, config.http_success_only).await?;
@@ -217,7 +260,7 @@ impl NewspaperBuilder {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum DocumentDownloadState {
     /// No request sent yet.
     NotRequested,
@@ -238,8 +281,8 @@ pub enum DocumentDownloadState {
     HttpFailure {
         /// Timestamp the response was received.
         received: Instant,
-        /// Statuscode of the error response
-        status: StatusCode,
+        /// The encountered [`reqwest::Error`].
+        error: reqwest::Error,
     },
     /// Received a success response at `received` but failed to parse the `body`
     /// into a [`select::Document`]

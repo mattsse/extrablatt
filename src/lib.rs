@@ -5,6 +5,7 @@ pub use language::Language;
 pub use newspaper::{Config, Newspaper};
 
 pub mod article;
+pub mod clean;
 pub mod date;
 mod error;
 pub mod extract;

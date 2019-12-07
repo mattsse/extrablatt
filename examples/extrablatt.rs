@@ -5,14 +5,14 @@ use extrablatt::{Extractor, Language};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     pretty_env_logger::init();
 
-    let newspaper = NewspaperBuilder::new("https://cnn.it/")?
+    let mut newspaper = NewspaperBuilder::new("https://cnn.it/")?
         .language(Language::Italian)
         .build()
         .await?;
 
-    let categories = newspaper
-        .extractor
-        .categories(&newspaper.main_page, &newspaper.base_url);
+    let categories = newspaper.extract_articles().await;
+
+    for (cat, doc) in categories {}
 
     dbg!(categories);
 

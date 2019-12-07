@@ -16,18 +16,13 @@ use url::Host;
 use lazy_static::lazy_static;
 
 use crate::article::{
-    ALLOWED_FILE_EXT,
-    ArticleContent,
-    ArticleUrl,
-    BAD_DOMAINS,
-    BAD_SEGMENTS,
-    GOOD_SEGMENTS,
+    ArticleContent, ArticleUrl, ALLOWED_FILE_EXT, BAD_DOMAINS, BAD_SEGMENTS, GOOD_SEGMENTS,
 };
 use crate::date::{ArticleDate, DateExtractor, RE_DATE_SEGMENTS_M_D_Y, RE_DATE_SEGMENTS_Y_M_D};
 use crate::error::ExtrablattError;
-use crate::Language;
 use crate::newspaper::Category;
 use crate::stopwords::CATEGORY_STOPWORDS;
+use crate::Language;
 
 lazy_static! {
     /// Regex for cleaning author names.
