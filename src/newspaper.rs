@@ -4,9 +4,9 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use fnv::{FnvHashMap, FnvHashSet};
-use futures::future::join_all;
+use futures::future::{join_all, select_all, SelectAll};
 use futures::stream::{FuturesUnordered, Stream};
-use futures::FutureExt;
+use futures::{Future, FutureExt, StreamExt, TryFutureExt};
 use reqwest::header::{HeaderMap, USER_AGENT};
 use reqwest::{Body, Error, Response};
 use reqwest::{Client, ClientBuilder, IntoUrl, StatusCode, Url};
@@ -15,12 +15,14 @@ use wasm_timer::Instant;
 
 use anyhow::{anyhow, Context, Result};
 
-use crate::article::Article;
+use crate::article::{Article, ArticleContent, ArticleUrl};
 use crate::error::ExtrablattError;
 use crate::extract::{DefaultExtractor, Extractor};
 use crate::language::Language;
-use crate::newspaper::DocumentDownloadState::DocumentReadFailure;
 use crate::storage::ArticleStore;
+use futures::task::Poll;
+use std::ops::DerefMut;
+use std::pin::Pin;
 
 #[derive(Debug)]
 pub struct Newspaper<TExtractor: Extractor = DefaultExtractor> {
@@ -37,7 +39,7 @@ pub struct Newspaper<TExtractor: Extractor = DefaultExtractor> {
     /// Default is [`extrablatt::DefaultExtractor`].
     pub extractor: TExtractor,
     /// Cache for retrieved articles.
-    article_cache: FnvHashMap<Url, DocumentDownloadState>,
+    articles: FnvHashMap<ArticleUrl, DocumentDownloadState>,
     /// All known categories for this newspaper.
     categories: FnvHashMap<Category, DocumentDownloadState>,
     /// Configuration for article extraction.
@@ -55,7 +57,7 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
 
     #[inline]
     pub fn clear(&mut self) {
-        self.article_cache.clear();
+        self.articles.clear();
         self.categories.clear()
     }
 
@@ -73,54 +75,80 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
         }
     }
 
-    pub async fn get_categories(&mut self) -> Result<Vec<(Category, &DocumentDownloadState)>> {
+    // TODO check cache restrictions
+    fn insert_new_articles(&mut self) {
+        for category_doc in self.categories.values().filter_map(|doc| match doc {
+            DocumentDownloadState::Success { doc, .. } => Some(doc),
+            _ => None,
+        }) {
+            for article in self.extractor.article_urls(&category_doc, &self.base_url) {
+                if !self.articles.contains_key(&article) {
+                    self.articles
+                        .insert(article, DocumentDownloadState::NotRequested);
+                }
+            }
+        }
+    }
+
+    pub async fn get_all_articles(&mut self) -> Result<Vec<ArticleContent<'_>>> {
+        // join all futures
+        let futures: Vec<_> = self
+            .articles
+            .iter()
+            .filter_map(|(article, state)| {
+                if state.is_not_requested() {
+                    Some(article.url.clone())
+                } else {
+                    None
+                }
+            })
+            .map(|url| {
+                self.client.get(url.clone()).send().then(|res| {
+                    futures::future::ok::<_, ()>((url, DocumentDownloadState::from_response(res)))
+                })
+            })
+            .collect();
+
+        Ok(vec![])
+    }
+
+    pub async fn get_all_categories(&mut self) -> Result<Vec<(Category, &DocumentDownloadState)>> {
         // join all futures
         let futures: Vec<_> = self
             .categories
             .iter()
-            .filter(|(_, state)| state.is_not_requested())
-            .map(|(cat, state)| {
+            .filter_map(|(cat, state)| {
+                if state.is_not_requested() {
+                    Some(cat)
+                } else {
+                    None
+                }
+            })
+            .map(|cat| {
                 let cat = cat.clone();
-                self.client
-                    .get(cat.url.clone())
-                    .send()
-                    .then(|res| futures::future::ok::<_, ()>((cat, res, Instant::now())))
+                self.client.get(cat.url.clone()).send().then(|res| {
+                    futures::future::ok::<_, ()>((cat, DocumentDownloadState::from_response(res)))
+                })
             })
             .collect();
 
         let mut requested_categories = Vec::with_capacity(futures.len());
 
         // save to unwrap since all responses are wrapped in an `Ok`.
-        for (cat, resp, received) in join_all(futures)
+        for (cat, res) in join_all(futures)
             .await
             .into_iter()
             .map(std::result::Result::unwrap)
         {
-            match resp {
-                Ok(resp) => {
-                    let state = self.categories.get_mut(&cat).unwrap();
-                    match resp.bytes().await {
-                        Ok(body) => {
-                            if let Ok(doc) = Document::from_read(&*body) {
-                                *state = DocumentDownloadState::Success { received, doc };
-                            } else {
-                                *state =
-                                    DocumentDownloadState::DocumentReadFailure { received, body };
-                            }
-                        }
-                        Err(error) => {
-                            *state = DocumentDownloadState::HttpFailure { received, error };
-                        }
-                    }
-                }
-                Err(error) => {
-                    let state = self.categories.get_mut(&cat).unwrap();
-                    *state = DocumentDownloadState::HttpFailure { received, error };
-                }
-            };
+            let res = res.await;
+            // TODO check config restrictions: check if http success only
+            let state = self.categories.get_mut(&cat).unwrap();
+            *state = res;
 
             requested_categories.push(cat);
         }
+
+        // TODO extract articles
 
         let mut res = Vec::with_capacity(requested_categories.len());
         for cat in requested_categories {
@@ -133,12 +161,10 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
 
     /// Refresh the main page for the newspaper and returns the old document.
     pub async fn refresh_homepage(&mut self) -> Result<Document> {
-        let main_page = Newspaper::get_document(
-            self.base_url.clone(),
-            &self.client,
-            self.config.http_success_only,
-        )
-        .await?;
+        let main_page = self
+            .get_document(self.base_url.clone())
+            .await
+            .success_document()?;
 
         // extract all categories
         self.insert_new_categories();
@@ -150,27 +176,53 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
     pub fn archive(&self) {
         unimplemented!()
     }
+
+    async fn get_document(&self, url: Url) -> DocumentDownloadState {
+        let resp = self.client.get(url).send().await;
+        DocumentDownloadState::from_response(resp).await
+    }
+
+    pub fn as_stream(&mut self) -> ArticleStream<'_, TExtractor> {
+        // TODO validate that select all is not empty
+        ArticleStream {
+            categories: self.categories.keys().map(|c| c.clone()).collect(),
+            paper: self,
+            articles: None,
+            //            next_article: None,
+        }
+    }
 }
 
-impl Newspaper {
-    pub(crate) async fn get_document(
-        url: Url,
-        client: &Client,
-        http_success_only: bool,
-    ) -> Result<Document> {
-        let resp = client.get(url).send().await?;
+pub struct ArticleStream<'a, TExtractor: Extractor> {
+    paper: &'a mut Newspaper<TExtractor>,
+    categories: Vec<Category>,
+    articles: Option<Vec<Url>>,
+    //    next_article:
+    //        Option<Box<dyn Future<Output = std::result::Result<reqwest::Response, reqwest::Error>>>>,
+}
 
-        if http_success_only {
-            if !resp.status().is_success() {
-                return Err(ExtrablattError::NoHttpSuccess {
-                    status: resp.status(),
-                })
-                .context(format!("Unsuccessful request to {:?}", resp.url()));
-            }
-        }
+impl<'a, TExtractor: Extractor> ArticleStream<'a, TExtractor> {
+    pub async fn next(
+        &mut self,
+    ) -> Option<std::result::Result<ArticleContent<'static>, ExtrablattError>> {
+        unimplemented!()
+    }
+}
 
-        Ok(Document::from_read(&*resp.bytes().await?)
-            .context(format!("Failed to read html as document."))?)
+impl<'a, TExtractor: Extractor> Stream for ArticleStream<'a, TExtractor> {
+    type Item = std::result::Result<ArticleContent<'static>, ExtrablattError>;
+
+    fn poll_next(
+        mut self: Pin<&mut Self>,
+        cx: &mut core::task::Context<'_>,
+    ) -> Poll<Option<Self::Item>> {
+        self.paper.client.get("").send().poll_unpin(cx);
+
+        //                if let Some(req) = self.next_article.as_mut() {
+        //
+        //                }
+
+        Poll::Pending
     }
 }
 
@@ -229,8 +281,11 @@ impl NewspaperBuilder {
             .timeout(config.request_timeout)
             .build()?;
 
-        let main_page =
-            Newspaper::get_document(base_url.clone(), &client, config.http_success_only).await?;
+        let resp = client.get(base_url.clone()).send().await;
+
+        let main_page = DocumentDownloadState::from_response(resp)
+            .await
+            .success_document()?;
 
         let mut paper = Newspaper {
             client,
@@ -239,7 +294,7 @@ impl NewspaperBuilder {
             base_url,
             extractor,
             categories: Default::default(),
-            article_cache: FnvHashMap::with_capacity_and_hasher(
+            articles: FnvHashMap::with_capacity_and_hasher(
                 config.max_doc_cache,
                 Default::default(),
             ),
@@ -277,8 +332,14 @@ pub enum DocumentDownloadState {
         /// The parsed html body.
         doc: Document,
     },
+    NoHttpSuccessResponse {
+        /// Timestamp the response was received.
+        received: Instant,
+        /// The response received.
+        response: reqwest::Response,
+    },
     /// Received an error response.
-    HttpFailure {
+    HttpRequestFailure {
         /// Timestamp the response was received.
         received: Instant,
         /// The encountered [`reqwest::Error`].
@@ -295,9 +356,71 @@ pub enum DocumentDownloadState {
 }
 
 impl DocumentDownloadState {
+    pub(crate) async fn from_response(
+        response: std::result::Result<Response, reqwest::Error>,
+    ) -> Self {
+        match response {
+            Ok(response) => {
+                if response.status().is_success() {
+                    match response.bytes().await {
+                        Ok(body) => {
+                            if let Ok(doc) = Document::from_read(&*body) {
+                                DocumentDownloadState::Success {
+                                    received: Instant::now(),
+                                    doc,
+                                }
+                            } else {
+                                DocumentDownloadState::DocumentReadFailure {
+                                    received: Instant::now(),
+                                    body,
+                                }
+                            }
+                        }
+                        Err(error) => DocumentDownloadState::HttpRequestFailure {
+                            received: Instant::now(),
+                            error,
+                        },
+                    }
+                } else {
+                    DocumentDownloadState::NoHttpSuccessResponse {
+                        received: Instant::now(),
+                        response,
+                    }
+                }
+            }
+            Err(error) => DocumentDownloadState::HttpRequestFailure {
+                received: Instant::now(),
+                error,
+            },
+        }
+    }
+
+    pub fn success_document(self) -> Result<Document> {
+        match self {
+            DocumentDownloadState::NotRequested => Err(anyhow!("Document was not requested yet")),
+            DocumentDownloadState::Success { doc, .. } => Ok(doc),
+            DocumentDownloadState::NoHttpSuccessResponse { response, .. } => {
+                Err(ExtrablattError::NoHttpSuccessResponse { response })?
+            }
+            DocumentDownloadState::HttpRequestFailure { error, .. } => {
+                Err(ExtrablattError::HttpRequestFailure { error })?
+            }
+            DocumentDownloadState::DocumentReadFailure { body, .. } => {
+                Err(ExtrablattError::ReadDocumentError { body })?
+            }
+        }
+    }
+
     pub fn is_http_failure(&self) -> bool {
         match self {
-            DocumentDownloadState::HttpFailure { .. } => true,
+            DocumentDownloadState::HttpRequestFailure { .. } => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_failure_response(&self) -> bool {
+        match self {
+            DocumentDownloadState::NoHttpSuccessResponse { .. } => true,
             _ => false,
         }
     }

@@ -11,6 +11,7 @@ use crate::error::ExtrablattError;
 use crate::extract::{DefaultExtractor, Extractor};
 use crate::language::Language;
 use crate::newspaper::Config;
+use std::hash::{Hash, Hasher};
 
 pub const ALLOWED_FILE_EXT: [&'static str; 12] = [
     "html", "htm", "md", "rst", "aspx", "jsp", "rhtml", "cgi", "xhtml", "jhtml", "asp", "shtml",
@@ -57,16 +58,19 @@ pub const BAD_SEGMENTS: [&'static str; 17] = [
 pub const BAD_DOMAINS: [&'static str; 4] = ["amazon", "doubleclick", "twitter", "outbrain"];
 
 #[derive(Debug, Clone)]
-pub struct ArticleUrl<'a> {
+pub struct ArticleUrl {
     /// The url of the article.
     pub url: Url,
     /// The title of the article.
-    pub title: Option<Cow<'a, str>>,
+    pub title: Option<String>,
 }
 
-impl<'a> ArticleUrl<'a> {
-    pub fn new(url: Url, title: Option<Cow<'a, str>>) -> Self {
-        Self { url, title }
+impl ArticleUrl {
+    pub fn new<T: ToString>(url: Url, title: Option<T>) -> Self {
+        Self {
+            url,
+            title: title.map(|s| s.to_string()),
+        }
     }
 
     /// If the article is related heavily to media: gallery, video, big
@@ -90,6 +94,26 @@ impl<'a> ArticleUrl<'a> {
             }
         }
         false
+    }
+}
+
+impl PartialEq for ArticleUrl {
+    fn eq(&self, other: &Self) -> bool {
+        self.url.eq(&other.url)
+    }
+}
+
+impl Hash for ArticleUrl {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.url.hash(state)
+    }
+}
+
+impl Eq for ArticleUrl {}
+
+impl Borrow<Url> for ArticleUrl {
+    fn borrow(&self) -> &Url {
+        &self.url
     }
 }
 
@@ -169,10 +193,8 @@ impl ArticleBuilder {
         let http_success_only = self.http_success_only.unwrap_or(true);
         if http_success_only {
             if !resp.status().is_success() {
-                return Err(ExtrablattError::NoHttpSuccess {
-                    status: resp.status(),
-                })
-                .context(format!("Unsuccessful request to {:?}", resp.url()));
+                let msg = format!("Unsuccessful request to {:?}", resp.url());
+                return Err(ExtrablattError::NoHttpSuccessResponse { response: resp }).context(msg);
             }
         }
 

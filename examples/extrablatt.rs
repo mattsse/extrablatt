@@ -10,11 +10,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .await?;
 
-    let categories = newspaper.extract_articles().await;
+    let stream = newspaper.as_stream();
 
-    for (cat, doc) in categories {}
+    //    let categories = newspaper.extract_articles().await;
+    //
+    //    for (cat, doc) in categories {}
 
-    dbg!(categories);
+    //    dbg!(categories);
 
     Ok(())
 }
