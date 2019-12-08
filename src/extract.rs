@@ -22,7 +22,9 @@ use crate::date::{ArticleDate, DateExtractor, RE_DATE_SEGMENTS_M_D_Y, RE_DATE_SE
 use crate::error::ExtrablattError;
 use crate::newspaper::Category;
 use crate::stopwords::CATEGORY_STOPWORDS;
+use crate::video::VideoNode;
 use crate::Language;
+use std::ops::Deref;
 
 lazy_static! {
     /// Regex for cleaning author names.
@@ -98,6 +100,14 @@ impl<'a> MetaNode<'a> {
 
     pub fn is_key_value(&self) -> bool {
         self.key().is_some() && self.value().is_some()
+    }
+}
+
+impl<'a> Deref for MetaNode<'a> {
+    type Target = Node<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
     }
 }
 
@@ -294,7 +304,7 @@ pub trait Extractor {
             .collect()
     }
 
-    fn article_urls<'a>(&self, doc: &'a Document, base_url: &Url) -> Vec<ArticleUrl<'a>> {
+    fn article_urls(&self, doc: &Document, base_url: &Url) -> Vec<ArticleUrl> {
         let options = Url::options().base_url(Some(base_url));
 
         doc.find(Name("a"))
@@ -308,7 +318,7 @@ pub trait Extractor {
             .filter_map(|(link, title)| {
                 options
                     .parse(link)
-                    .map(|url| ArticleUrl::new(url, title.map(Cow::Borrowed)))
+                    .map(|url| ArticleUrl::new(url, title))
                     .ok()
             })
             .filter(|article| Self::is_article(article, base_url))
@@ -507,6 +517,27 @@ pub trait Extractor {
         }
 
         None
+    }
+
+    fn videos<'a>(&self, doc: &'a Document) -> Vec<VideoNode<'a>> {
+        let mut videos: Vec<_> = doc
+            .find(Name("iframe").or(Name("object").or(Name("video"))))
+            .map(VideoNode::new)
+            .collect();
+
+        videos.extend(
+            doc.find(Name("embed"))
+                .filter(|n| {
+                    if let Some(parent) = n.parent() {
+                        parent.name() != Some("object")
+                    } else {
+                        false
+                    }
+                })
+                .map(VideoNode::new),
+        );
+
+        videos
     }
 }
 
