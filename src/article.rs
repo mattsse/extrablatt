@@ -11,6 +11,7 @@ use crate::error::ExtrablattError;
 use crate::extract::{DefaultExtractor, Extractor};
 use crate::language::Language;
 use crate::newspaper::Config;
+use reqwest::header::{HeaderMap, USER_AGENT};
 use std::hash::{Hash, Hasher};
 
 pub const ALLOWED_FILE_EXT: [&'static str; 12] = [
@@ -123,6 +124,8 @@ pub struct Article {
     pub url: Url,
     /// The parsed response html `Document`.
     pub doc: Document,
+    /// The content of the article.
+    pub content: ArticleContent<'static>,
     /// The expected language of the article.
     pub language: Language,
 }
@@ -134,10 +137,6 @@ impl Article {
     pub fn builder<T: IntoUrl>(url: T) -> Result<ArticleBuilder> {
         ArticleBuilder::new(url)
     }
-
-    pub fn extract<T: Extractor>(&self, extractor: &T) -> Result<ArticleContent> {
-        unimplemented!()
-    }
 }
 
 pub struct ArticleBuilder {
@@ -145,6 +144,7 @@ pub struct ArticleBuilder {
     timeout: Option<Duration>,
     http_success_only: Option<bool>,
     language: Option<Language>,
+    browser_user_agent: Option<String>,
 }
 
 impl ArticleBuilder {
@@ -156,7 +156,13 @@ impl ArticleBuilder {
             timeout: None,
             http_success_only: None,
             language: None,
+            browser_user_agent: None,
         })
+    }
+
+    pub fn browser_user_agent<T: ToString>(mut self, browser_user_agent: T) -> Self {
+        self.browser_user_agent = Some(browser_user_agent.to_string());
+        self
     }
 
     pub fn timeout(mut self, dur: Duration) -> Self {
@@ -175,6 +181,13 @@ impl ArticleBuilder {
     }
 
     pub async fn get(self) -> Result<Article> {
+        self.get_with_extractor(&DefaultExtractor::default()).await
+    }
+
+    pub async fn get_with_extractor<TExtract: Extractor>(
+        self,
+        extractor: &TExtract,
+    ) -> Result<Article> {
         let url = self
             .url
             .context("Url of the article must be initialized.")?;
@@ -183,8 +196,19 @@ impl ArticleBuilder {
             .timeout
             .unwrap_or_else(|| Duration::from_secs(Config::DEFAULT_REQ_TIMEOUT_SEC));
 
+        let mut headers = HeaderMap::with_capacity(1);
+
+        headers.insert(
+            USER_AGENT,
+            self.browser_user_agent
+                .map(|x| x.parse())
+                .unwrap_or_else(|| Config::user_agent().parse())
+                .context("Failed to parse user agent header.")?,
+        );
+
         let resp = Client::builder()
             .timeout(timeout)
+            .default_headers(headers)
             .build()?
             .get(url)
             .send()
@@ -202,9 +226,12 @@ impl ArticleBuilder {
         let doc = Document::from_read(&*resp.bytes().await?)
             .context(format!("Failed to read {:?} html as document.", url))?;
 
+        let content = extractor.article_content(&doc).into_owned();
+
         Ok(Article {
             url,
             doc,
+            content,
             language: self.language.unwrap_or_default(),
         })
     }
@@ -223,6 +250,28 @@ pub struct ArticleContent<'a> {
     pub top_image: Option<Url>,
     pub images: Option<Vec<Url>>,
     pub videos: Option<Vec<Url>>,
+}
+
+impl<'a> ArticleContent<'a> {
+    pub fn into_owned(self) -> ArticleContent<'static> {
+        ArticleContent {
+            authors: self
+                .authors
+                .map(|x| x.into_iter().map(Cow::into_owned).map(Cow::Owned).collect()),
+            title: self.title.map(Cow::into_owned).map(Cow::Owned),
+            date: self.date,
+            keywords: self
+                .keywords
+                .map(|x| x.into_iter().map(Cow::into_owned).map(Cow::Owned).collect()),
+            summary: self.summary.map(Cow::into_owned).map(Cow::Owned),
+            text: self.text.map(Cow::into_owned).map(Cow::Owned),
+            language: self.language,
+            thumbnail: self.thumbnail,
+            top_image: self.top_image,
+            images: self.images,
+            videos: self.videos,
+        }
+    }
 }
 
 #[derive(Debug, Default)]

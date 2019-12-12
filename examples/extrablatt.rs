@@ -1,22 +1,24 @@
-use extrablatt::newspaper::NewspaperBuilder;
-use extrablatt::{Extractor, Language};
+use extrablatt::{Language, NewspaperBuilder};
+use futures::{
+    pin_mut,
+    stream::{Stream, StreamExt},
+};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     pretty_env_logger::init();
 
-    let mut newspaper = NewspaperBuilder::new("https://cnn.it/")?
-        .language(Language::Italian)
-        .build()
-        .await?;
+    let newspaper = NewspaperBuilder::new("https://cnn.com/")?.build().await?;
 
-    let stream = newspaper.as_stream();
-
-    //    let categories = newspaper.extract_articles().await;
-    //
-    //    for (cat, doc) in categories {}
-
-    //    dbg!(categories);
+    let stream = newspaper.into_stream().await;
+    pin_mut!(stream);
+    while let Some(article) = stream.next().await {
+        if let Ok(article) = article {
+            println!("article '{:?}'", article.content.title)
+        } else {
+            println!("{:?}", article);
+        }
+    }
 
     Ok(())
 }
