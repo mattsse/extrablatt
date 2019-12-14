@@ -199,7 +199,8 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
 }
 
 impl<TExtractor: Extractor + Unpin> Newspaper<TExtractor> {
-    /// Converts the newspaper into a stream, yielding all available [`extrablatt::Article`]s.
+    /// Converts the newspaper into a stream, yielding all available
+    /// [`extrablatt::Article`]s.
     ///
     /// Fetches all available categories first, hence the `async`.
     pub async fn into_stream(
@@ -220,8 +221,8 @@ impl<TExtractor: Extractor + Unpin> Newspaper<TExtractor> {
                         .client
                         .get(article_url.url.clone())
                         .send()
-                        .and_then(|resp| {
-                            async { resp.bytes().await.map(|bytes| (article_url.url, bytes)) }
+                        .and_then(|resp| async {
+                            resp.bytes().await.map(|bytes| (article_url.url, bytes))
                         })
                         .boxed();
 
