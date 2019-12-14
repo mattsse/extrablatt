@@ -1,7 +1,8 @@
-use select::node::Node;
-use select::predicate::{Attr, Name, Predicate};
 use std::ops::Deref;
 use std::str::FromStr;
+
+use select::node::Node;
+use select::predicate::{Attr, Name, Predicate};
 use url::{ParseError, Url};
 
 #[derive(Debug, Clone)]

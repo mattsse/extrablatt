@@ -10,7 +10,7 @@ use lazy_static::lazy_static;
 
 use crate::language::Language;
 
-pub(crate) static CATEGORY_STOPWORDS: [&'static str; 67] = [
+pub(crate) static CATEGORY_STOPWORDS: [&str; 67] = [
     "about",
     "help",
     "privacy",
@@ -115,7 +115,7 @@ impl StopWords {
 }
 
 /// Stopwords for Dutch Language
-pub static DUTCH_STOPWORDS: [&'static str; 48] = [
+pub static DUTCH_STOPWORDS: [&str; 48] = [
     "aan", "af", "al", "als", "bij", "dan", "dat", "die", "dit", "een", "en", "er", "had", "heb",
     "hem", "het", "hij", "hoe", "hun", "ik", "in", "is", "je", "kan", "me", "men", "met", "mij",
     "nog", "nu", "of", "ons", "ook", "te", "tot", "uit", "van", "was", "wat", "we", "wel", "wij",
@@ -123,7 +123,7 @@ pub static DUTCH_STOPWORDS: [&'static str; 48] = [
 ];
 
 /// Stopwords for Chinese Language
-pub static CHINESE_STOPWORDS: [&'static str; 125] = [
+pub static CHINESE_STOPWORDS: [&str; 125] = [
     "的", "一", "不", "在", "人", "有", "是", "为", "以", "于", "上", "他", "而", "后", "之", "来",
     "及", "了", "因", "下", "可", "到", "由", "这", "与", "也", "此", "但", "并", "个", "其", "已",
     "无", "小", "我", "们", "起", "最", "再", "今", "去", "好", "只", "又", "或", "很", "亦", "某",
@@ -135,7 +135,7 @@ pub static CHINESE_STOPWORDS: [&'static str; 125] = [
 ];
 
 /// Stopwords for Vietnamese Language
-pub static VIETNAMESE_STOPWORDS: [&'static str; 121] = [
+pub static VIETNAMESE_STOPWORDS: [&str; 121] = [
     "nhận",
     "rằng",
     "cao",
@@ -260,7 +260,7 @@ pub static VIETNAMESE_STOPWORDS: [&'static str; 121] = [
 ];
 
 /// Stopwords for Norwegian Language
-pub static NORWEGIAN_STOPWORDS: [&'static str; 120] = [
+pub static NORWEGIAN_STOPWORDS: [&str; 120] = [
     "at", "av", "de", "den", "der", "det", "du", "en", "er", "et", "for", "fra", "før", "med",
     "og", "om", "over", "på", "som", "til", "ved", "år", "alle", "bare", "ble", "bort", "bra",
     "da", "deg", "dem", "denne", "dere", "deres", "det", "dette", "din", "disse", "dit", "ditt",
@@ -274,7 +274,7 @@ pub static NORWEGIAN_STOPWORDS: [&'static str; 120] = [
 ];
 
 /// Stopwords for  Norwegian (Bokmål) Language
-pub static NORWEGIAN_BOKMAL_STOPWORDS: [&'static str; 117] = [
+pub static NORWEGIAN_BOKMAL_STOPWORDS: [&str; 117] = [
     "alle", "andre", "arbeid", "av", "begge", "bort", "bra", "bruke", "da", "denne", "der",
     "deres", "det", "din", "disse", "du", "eller", "en", "ene", "eneste", "enhver", "enn", "er",
     "et", "folk", "for", "fordi", "forsÛke", "fra", "fÅ", "fÛr", "fÛrst", "gjorde", "gjÛre", "god",
@@ -288,7 +288,7 @@ pub static NORWEGIAN_BOKMAL_STOPWORDS: [&'static str; 117] = [
 ];
 
 /// Stopwords for Arabic Language
-pub static ARABIC_STOPWORDS: [&'static str; 162] = [
+pub static ARABIC_STOPWORDS: [&str; 162] = [
     "﻿فى",
     "في",
     "كل",
@@ -454,7 +454,7 @@ pub static ARABIC_STOPWORDS: [&'static str; 162] = [
 ];
 
 /// Stopwords for Lithuanian Language
-pub static LITHUANIAN_STOPWORDS: [&'static str; 165] = [
+pub static LITHUANIAN_STOPWORDS: [&str; 165] = [
     "taip", "jas", "be", "kito", "taps", "juos", "dvi", "būti", "jo", "kita", "juo", "kokį",
     "gero", "tie", "mes", "bei", "savo", "mūsų", "bus", "rodo", "jame", "kam", "prie", "kada",
     "itin", "kuo", "tiek", "toks", "ir", "dar", "nei", "patį", "visa", "mums", "kad", "ko", "arba",
@@ -471,7 +471,7 @@ pub static LITHUANIAN_STOPWORDS: [&'static str; 165] = [
 ];
 
 /// Stopwords for Turkish Language
-pub static TURKISH_STOPWORDS: [&'static str; 210] = [
+pub static TURKISH_STOPWORDS: [&str; 210] = [
     "acaba",
     "altmış",
     "altı",
@@ -685,7 +685,7 @@ pub static TURKISH_STOPWORDS: [&'static str; 210] = [
 ];
 
 /// Stopwords for Serbian Language
-pub static SERBIAN_STOPWORDS: [&'static str; 133] = [
+pub static SERBIAN_STOPWORDS: [&str; 133] = [
     "baš",
     "bez",
     "biæe",
@@ -822,7 +822,7 @@ pub static SERBIAN_STOPWORDS: [&'static str; 133] = [
 ];
 
 /// Stopwords for French Language
-pub static FRENCH_STOPWORDS: [&'static str; 198] = [
+pub static FRENCH_STOPWORDS: [&str; 198] = [
     "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in", "into", "is", "it",
     "no", "not", "of", "on", "or", "s", "such", "t", "that", "the", "their", "then", "there",
     "these", "they", "this", "to", "was", "will", "with", "au", "aux", "avec", "ce", "ces", "dans",
@@ -843,7 +843,7 @@ pub static FRENCH_STOPWORDS: [&'static str; 198] = [
 ];
 
 /// Stopwords for Russian Language
-pub static RUSSIAN_STOPWORDS: [&'static str; 421] = [
+pub static RUSSIAN_STOPWORDS: [&str; 421] = [
     "а",
     "е",
     "и",
@@ -1268,7 +1268,7 @@ pub static RUSSIAN_STOPWORDS: [&'static str; 421] = [
 ];
 
 /// Stopwords for English Language
-pub static ENGLISH_STOPWORDS: [&'static str; 546] = [
+pub static ENGLISH_STOPWORDS: [&str; 546] = [
     "a's",
     "able",
     "about",
@@ -1818,7 +1818,7 @@ pub static ENGLISH_STOPWORDS: [&'static str; 546] = [
 ];
 
 /// Stopwords for Hindi Language
-pub static HINDI_STOPWORDS: [&'static str; 237] = [
+pub static HINDI_STOPWORDS: [&str; 237] = [
     "अंदर",
     "अत",
     "अदि",
@@ -2059,7 +2059,7 @@ pub static HINDI_STOPWORDS: [&'static str; 237] = [
 ];
 
 /// Stopwords for Japanese Language
-pub static JAPANESE_STOPWORDS: [&'static str; 134] = [
+pub static JAPANESE_STOPWORDS: [&str; 134] = [
     "あそこ",
     "あっ",
     "あの",
@@ -2197,7 +2197,7 @@ pub static JAPANESE_STOPWORDS: [&'static str; 134] = [
 ];
 
 /// Stopwords for Swahili Language
-pub static SWAHILI_STOPWORDS: [&'static str; 74] = [
+pub static SWAHILI_STOPWORDS: [&str; 74] = [
     "akasema",
     "alikuwa",
     "alisema",
@@ -2275,7 +2275,7 @@ pub static SWAHILI_STOPWORDS: [&'static str; 74] = [
 ];
 
 /// Stopwords for Polish Language
-pub static POLISH_STOPWORDS: [&'static str; 350] = [
+pub static POLISH_STOPWORDS: [&str; 350] = [
     "a",
     "aby",
     "ach",
@@ -2629,7 +2629,7 @@ pub static POLISH_STOPWORDS: [&'static str; 350] = [
 ];
 
 /// Stopwords for Persian Language
-pub static PERSIAN_STOPWORDS: [&'static str; 799] = [
+pub static PERSIAN_STOPWORDS: [&str; 799] = [
     "!",
     ",",
     ".",
@@ -3432,7 +3432,7 @@ pub static PERSIAN_STOPWORDS: [&'static str; 799] = [
 ];
 
 /// Stopwords for Greek Language
-pub static GREEK_STOPWORDS: [&'static str; 1079] = [
+pub static GREEK_STOPWORDS: [&str; 1079] = [
     "αγάπη",
     "αγιάζι",
     "αγορά",
@@ -4515,7 +4515,7 @@ pub static GREEK_STOPWORDS: [&'static str; 1079] = [
 ];
 
 /// Stopwords for Swedish Language
-pub static SWEDISH_STOPWORDS: [&'static str; 543] = [
+pub static SWEDISH_STOPWORDS: [&str; 543] = [
     "kunna",
     "om",
     "ovan",
@@ -5062,7 +5062,7 @@ pub static SWEDISH_STOPWORDS: [&'static str; 543] = [
 ];
 
 /// Stopwords for Slovenian Language
-pub static SLOVENIAN_STOPWORDS: [&'static str; 446] = [
+pub static SLOVENIAN_STOPWORDS: [&str; 446] = [
     "a",
     "ali",
     "april",
@@ -5512,7 +5512,7 @@ pub static SLOVENIAN_STOPWORDS: [&'static str; 446] = [
 ];
 
 /// Stopwords for German Language
-pub static GERMAN_STOPWORDS: [&'static str; 894] = [
+pub static GERMAN_STOPWORDS: [&str; 894] = [
     "der",
     "die",
     "und",
@@ -6410,7 +6410,7 @@ pub static GERMAN_STOPWORDS: [&'static str; 894] = [
 ];
 
 /// Stopwords for Italian Language
-pub static ITALIAN_STOPWORDS: [&'static str; 287] = [
+pub static ITALIAN_STOPWORDS: [&str; 287] = [
     "﻿ad",
     "al",
     "allo",
@@ -6701,7 +6701,7 @@ pub static ITALIAN_STOPWORDS: [&'static str; 287] = [
 ];
 
 /// Stopwords for Portuguese Language
-pub static PORTUGUESE_STOPWORDS: [&'static str; 560] = [
+pub static PORTUGUESE_STOPWORDS: [&str; 560] = [
     "a",
     "acerca",
     "adeus",
@@ -7265,7 +7265,7 @@ pub static PORTUGUESE_STOPWORDS: [&'static str; 560] = [
 ];
 
 /// Stopwords for Hebrew Language
-pub static HEBREW_STOPWORDS: [&'static str; 221] = [
+pub static HEBREW_STOPWORDS: [&str; 221] = [
     "אני",
     "את",
     "אתה",
@@ -7490,7 +7490,7 @@ pub static HEBREW_STOPWORDS: [&'static str; 221] = [
 ];
 
 /// Stopwords for Croatian Language
-pub static CROATIAN_STOPWORDS: [&'static str; 179] = [
+pub static CROATIAN_STOPWORDS: [&str; 179] = [
     "a", "ako", "ali", "bi", "bih", "bila", "bili", "bilo", "bio", "bismo", "biste", "biti",
     "bumo", "da", "do", "duž", "ga", "hoće", "hoćemo", "hoćete", "hoćeš", "hoću", "i", "iako",
     "ih", "ili", "iz", "ja", "je", "jedna", "jedne", "jedno", "jer", "jesam", "jesi", "jesmo",
@@ -7509,7 +7509,7 @@ pub static CROATIAN_STOPWORDS: [&'static str; 179] = [
 ];
 
 /// Stopwords for Estonian Language
-pub static ESTONIAN_STOPWORDS: [&'static str; 44] = [
+pub static ESTONIAN_STOPWORDS: [&str; 44] = [
     "ei", "oma", "jah", "nad", "kes", "mind", "ning", "nii", "sa", "olen", "ka", "mulle", "või",
     "te", "ära", "oled", "sest", "ole", "mis", "olema", "see", "seda", "mida", "oli", "mul", "on",
     "kõik", "minu", "midagi", "ma", "pole", "mu", "kas", "me", "siis", "kui", "ega", "ja", "ta",
@@ -7517,7 +7517,7 @@ pub static ESTONIAN_STOPWORDS: [&'static str; 44] = [
 ];
 
 /// Stopwords for Indonesian Language
-pub static INDONESIAN_STOPWORDS: [&'static str; 1309] = [
+pub static INDONESIAN_STOPWORDS: [&str; 1309] = [
     "a",
     "abad",
     "acara",
@@ -8830,7 +8830,7 @@ pub static INDONESIAN_STOPWORDS: [&'static str; 1309] = [
 ];
 
 /// Stopwords for Romanian Language
-pub static ROMANIAN_STOPWORDS: [&'static str; 281] = [
+pub static ROMANIAN_STOPWORDS: [&str; 281] = [
     "acea",
     "aceasta",
     "această",
@@ -9115,7 +9115,7 @@ pub static ROMANIAN_STOPWORDS: [&'static str; 281] = [
 ];
 
 /// Stopwords for Spanish Language
-pub static SPANISH_STOPWORDS: [&'static str; 310] = [
+pub static SPANISH_STOPWORDS: [&str; 310] = [
     "de",
     "la",
     "que",
@@ -9429,7 +9429,7 @@ pub static SPANISH_STOPWORDS: [&'static str; 310] = [
 ];
 
 /// Stopwords for Korean Language
-pub static KOREAN_STOPWORDS: [&'static str; 70] = [
+pub static KOREAN_STOPWORDS: [&str; 70] = [
     "을",
     "의",
     "에",
@@ -9503,7 +9503,7 @@ pub static KOREAN_STOPWORDS: [&'static str; 70] = [
 ];
 
 /// Stopwords for Hungarian Language
-pub static HUNGARIAN_STOPWORDS: [&'static str; 403] = [
+pub static HUNGARIAN_STOPWORDS: [&str; 403] = [
     "a",
     "á",
     "ahogy",
@@ -9910,7 +9910,7 @@ pub static HUNGARIAN_STOPWORDS: [&'static str; 403] = [
 ];
 
 /// Stopwords for Danish Language
-pub static DANISH_STOPWORDS: [&'static str; 101] = [
+pub static DANISH_STOPWORDS: [&str; 101] = [
     "af", "alle", "andet", "andre", "at", "begge", "da", "de", "den", "denne", "der", "deres",
     "det", "dette", "dig", "din", "dog", "du", "ej", "eller", "en", "end", "ene", "eneste",
     "enhver", "et", "fem", "fire", "flere", "fleste", "for", "fordi", "forrige", "fra", "få",
@@ -9923,7 +9923,7 @@ pub static DANISH_STOPWORDS: [&'static str; 101] = [
 ];
 
 /// Stopwords for Finnish Language
-pub static FINNISH_STOPWORDS: [&'static str; 68] = [
+pub static FINNISH_STOPWORDS: [&str; 68] = [
     "alla",
     "ansiosta",
     "ehkä",
@@ -9995,7 +9995,7 @@ pub static FINNISH_STOPWORDS: [&'static str; 68] = [
 ];
 
 /// Stopwords for Bulgarian Language
-pub static BULGARIAN_STOPWORDS: [&'static str; 259] = [
+pub static BULGARIAN_STOPWORDS: [&str; 259] = [
     "а",
     "автентичен",
     "аз",
@@ -10258,7 +10258,7 @@ pub static BULGARIAN_STOPWORDS: [&'static str; 259] = [
 ];
 
 /// Stopwords for Thai Language
-pub static THAI_STOPWORDS: [&'static str; 115] = [
+pub static THAI_STOPWORDS: [&str; 115] = [
     "กล่าว",
     "กว่า",
     "กัน",
@@ -10377,7 +10377,7 @@ pub static THAI_STOPWORDS: [&'static str; 115] = [
 ];
 
 /// Stopwords for  Belarusian Language
-pub static BELARUSIAN_STOPWORDS: [&'static str; 96] = [
+pub static BELARUSIAN_STOPWORDS: [&str; 96] = [
     "без",
     "более",
     "был",
@@ -10477,7 +10477,7 @@ pub static BELARUSIAN_STOPWORDS: [&'static str; 96] = [
 ];
 
 /// Stopwords for Macedonian Language
-pub static MACEDONIAN_STOPWORDS: [&'static str; 173] = [
+pub static MACEDONIAN_STOPWORDS: [&str; 173] = [
     "а",
     "е",
     "од",
@@ -10654,7 +10654,7 @@ pub static MACEDONIAN_STOPWORDS: [&'static str; 173] = [
 ];
 
 /// Stopwords for Ukrainian Language
-pub static UKRAINIAN_STOPWORDS: [&'static str; 373] = [
+pub static UKRAINIAN_STOPWORDS: [&str; 373] = [
     "a",
     "б",
     "в",

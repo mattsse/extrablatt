@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::ops::Deref;
 use std::path::Path;
 use std::str::FromStr;
 
@@ -29,7 +30,6 @@ use crate::newspaper::Category;
 use crate::stopwords::CATEGORY_STOPWORDS;
 use crate::video::VideoNode;
 use crate::Language;
-use std::ops::Deref;
 
 lazy_static! {
     /// Regex for cleaning author names.
@@ -174,12 +174,12 @@ pub trait Extractor {
 
     /// When the article was published (and last updated).
     fn publishing_date(&self, doc: &Document, base_url: Option<&Url>) -> Option<ArticleDate> {
-        if let Some(date) = DateExtractor::from_doc(doc) {
+        if let Some(date) = DateExtractor::extract_from_doc(doc) {
             return Some(date);
         }
 
         if let Some(url) = base_url {
-            return DateExtractor::from_str(url.path());
+            return DateExtractor::extract_from_str(url.path());
         }
 
         None
@@ -323,7 +323,7 @@ pub trait Extractor {
             .filter_map(|(link, title)| {
                 options
                     .parse(link)
-                    .map(|url| ArticleUrl::new(url, title))
+                    .map(|url| ArticleUrl::new_with_title(url, title))
                     .ok()
             })
             .filter(|article| Self::is_article(article, base_url))
@@ -381,17 +381,15 @@ pub trait Extractor {
                     if segment.len() > 10 {
                         path_segments.push(segment.to_string());
                     }
+                } else if extension.chars().all(char::is_numeric) {
+                    // prevents false negatives for articles with a trailing id like `1.343234`
+                    path_segments.push(last_segment);
                 } else {
-                    if extension.chars().all(char::is_numeric) {
-                        // prevents false negatives for articles with a trailing id like `1.343234`
-                        path_segments.push(last_segment);
-                    } else {
-                        debug!(
-                            "Encountered blacklisted filetype {} on article {:?}",
-                            last_segment, article.url
-                        );
-                        return false;
-                    }
+                    debug!(
+                        "Encountered blacklisted filetype {} on article {:?}",
+                        last_segment, article.url
+                    );
+                    return false;
                 }
             } else {
                 path_segments.push(last_segment);
@@ -407,7 +405,7 @@ pub trait Extractor {
 
             if dash_count > 4 || underscore_count > 4 {
                 if let Some(Host::Domain(domain)) = article.url.host() {
-                    if let Some(domain) = domain.split('.').rev().skip(1).next() {
+                    if let Some(domain) = domain.split('.').rev().nth(1) {
                         let delim = if underscore_count > dash_count {
                             '_'
                         } else {
@@ -475,7 +473,7 @@ pub trait Extractor {
             return false;
         }
 
-        return is_valid_domain(&category.url, base_url);
+        is_valid_domain(&category.url, base_url)
     }
 
     /// Finds all of the top level urls, assuming that these are the category
@@ -648,7 +646,7 @@ mod tests {
             ($base:expr => $($url:expr,)*) => {
                 let base_url = Url::parse($base).unwrap();
                 $(
-                    let article = ArticleUrl::new(Url::parse($url).unwrap(), None);
+                    let article = ArticleUrl::new(Url::parse($url).unwrap());
                     assert!(DefaultExtractor::is_article(&article, &base_url));
                 )*
             };
@@ -657,7 +655,6 @@ mod tests {
         assert_articles!(
                "https://extrablatt.com" =>
                "https://extrablatt.com/politics/live-news/some-title-12-05-2019/index.html",
-               "https://extrablatt.com/2019/12/04/us/politics/some-title.html",
                "https://extrablatt.com/2019/12/04/us/politics/some-title.html",
                "https://www.extrablatt.com/graphics/2019/investigations/some-title/",
                "https://extrablatt.com/2019/12/06/uk/some-longer-title-with-dashes/index.html",

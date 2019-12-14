@@ -1,7 +1,9 @@
 use std::borrow::{Borrow, Cow};
+use std::hash::{Hash, Hasher};
 use std::time::Duration;
 
 use anyhow::{Context, Result};
+use reqwest::header::{HeaderMap, USER_AGENT};
 use reqwest::{Client, IntoUrl, RequestBuilder, Url};
 use select::document::Document;
 use tokio::future::FutureExt;
@@ -11,14 +13,12 @@ use crate::error::ExtrablattError;
 use crate::extract::{DefaultExtractor, Extractor};
 use crate::language::Language;
 use crate::newspaper::Config;
-use reqwest::header::{HeaderMap, USER_AGENT};
-use std::hash::{Hash, Hasher};
 
-pub const ALLOWED_FILE_EXT: [&'static str; 12] = [
+pub const ALLOWED_FILE_EXT: [&str; 12] = [
     "html", "htm", "md", "rst", "aspx", "jsp", "rhtml", "cgi", "xhtml", "jhtml", "asp", "shtml",
 ];
 
-pub const GOOD_SEGMENTS: [&'static str; 15] = [
+pub const GOOD_SEGMENTS: [&str; 15] = [
     "story",
     "article",
     "feature",
@@ -36,7 +36,7 @@ pub const GOOD_SEGMENTS: [&'static str; 15] = [
     "investigations",
 ];
 
-pub const BAD_SEGMENTS: [&'static str; 17] = [
+pub const BAD_SEGMENTS: [&str; 17] = [
     "careers",
     "contact",
     "about",
@@ -56,7 +56,7 @@ pub const BAD_SEGMENTS: [&'static str; 17] = [
     "admin",
 ];
 
-pub const BAD_DOMAINS: [&'static str; 4] = ["amazon", "doubleclick", "twitter", "outbrain"];
+pub const BAD_DOMAINS: [&str; 4] = ["amazon", "doubleclick", "twitter", "outbrain"];
 
 #[derive(Debug, Clone)]
 pub struct ArticleUrl {
@@ -67,7 +67,11 @@ pub struct ArticleUrl {
 }
 
 impl ArticleUrl {
-    pub fn new<T: ToString>(url: Url, title: Option<T>) -> Self {
+    pub fn new(url: Url) -> Self {
+        Self { url, title: None }
+    }
+
+    pub fn new_with_title<T: ToString>(url: Url, title: Option<T>) -> Self {
         Self {
             url,
             title: title.map(|s| s.to_string()),
@@ -215,11 +219,9 @@ impl ArticleBuilder {
             .await?;
 
         let http_success_only = self.http_success_only.unwrap_or(true);
-        if http_success_only {
-            if !resp.status().is_success() {
-                let msg = format!("Unsuccessful request to {:?}", resp.url());
-                return Err(ExtrablattError::NoHttpSuccessResponse { response: resp }).context(msg);
-            }
+        if http_success_only && !resp.status().is_success() {
+            let msg = format!("Unsuccessful request to {:?}", resp.url());
+            return Err(ExtrablattError::NoHttpSuccessResponse { response: resp }).context(msg);
         }
 
         let url = resp.url().to_owned();

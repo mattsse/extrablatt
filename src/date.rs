@@ -111,7 +111,7 @@ impl DateExtractor {
     ///
     /// 1. Look in the common `<meta>` nodes.
     /// 2. Regex the `<head>` node
-    pub fn from_doc(doc: &Document) -> Option<ArticleDate> {
+    pub fn extract_from_doc(doc: &Document) -> Option<ArticleDate> {
         if let Some(published) =
             DateExtractor::extract_date(doc, &PUBLISH_DATE_NODES, &RE_KEY_VALUE_PUBLISH_DATE)
         {
@@ -120,7 +120,7 @@ impl DateExtractor {
                 &MODIFIED_DATE_NODES,
                 &RE_KEY_VALUE_MODIFIED_DATE,
             )
-            .map(|date| Update::DateTime(date));
+            .map(Update::DateTime);
             return Some(ArticleDate {
                 published: Date::DateTime(published),
                 last_updated,
@@ -183,7 +183,7 @@ impl DateExtractor {
 
     /// Extract the publishing timestamp from plain text using fuzzy searching
     /// with `dtparse`.
-    pub fn from_str(s: &str) -> Option<ArticleDate> {
+    pub fn extract_from_str(s: &str) -> Option<ArticleDate> {
         DateExtractor::fuzzy_dtparse(s).map(|published| ArticleDate {
             published: Date::DateTime(published),
             last_updated: None,

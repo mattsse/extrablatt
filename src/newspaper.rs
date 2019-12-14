@@ -1,11 +1,15 @@
 use std::borrow::Borrow;
+use std::ops::DerefMut;
 use std::path::PathBuf;
+use std::pin::Pin;
+use std::process::Output;
 use std::time::Duration;
 
 use bytes::Bytes;
 use fnv::{FnvHashMap, FnvHashSet};
 use futures::future::{join_all, select_all, SelectAll};
 use futures::stream::{FuturesUnordered, Stream};
+use futures::task::Poll;
 use futures::{Future, FutureExt, StreamExt, TryFutureExt};
 use reqwest::header::{HeaderMap, USER_AGENT};
 use reqwest::{Body, Error, Response};
@@ -20,10 +24,6 @@ use crate::error::ExtrablattError;
 use crate::extract::{DefaultExtractor, Extractor};
 use crate::language::Language;
 use crate::storage::ArticleStore;
-use futures::task::Poll;
-use std::ops::DerefMut;
-use std::pin::Pin;
-use std::process::Output;
 
 #[derive(Debug)]
 pub struct Newspaper<TExtractor: Extractor = DefaultExtractor> {
@@ -69,10 +69,9 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
 
     fn insert_new_categories(&mut self) {
         for category in self.extractor.categories(&self.main_page, &self.base_url) {
-            if !self.categories.contains_key(&category) {
-                self.categories
-                    .insert(category, DocumentDownloadState::NotRequested);
-            }
+            self.categories
+                .entry(category)
+                .or_insert(DocumentDownloadState::NotRequested);
         }
     }
 
@@ -83,10 +82,9 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
             _ => None,
         }) {
             for article in self.extractor.article_urls(&category_doc, &self.base_url) {
-                if !self.articles.contains_key(&article) {
-                    self.articles
-                        .insert(article, DocumentDownloadState::NotRequested);
-                }
+                self.articles
+                    .entry(article)
+                    .or_insert(DocumentDownloadState::NotRequested);
             }
         }
     }
@@ -145,10 +143,9 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
 
             if let DocumentDownloadState::Success { doc, .. } = &res {
                 for url in self.extractor.article_urls(doc, &self.base_url) {
-                    if !self.articles.contains_key(&url) {
-                        self.articles
-                            .insert(url, DocumentDownloadState::NotRequested);
-                    }
+                    self.articles
+                        .entry(url)
+                        .or_insert(DocumentDownloadState::NotRequested);
                 }
             } else {
                 // don't insert if only successful responses are allowed
@@ -235,7 +232,7 @@ impl<TExtractor: Extractor + Unpin> Newspaper<TExtractor> {
                         language: self
                             .extractor
                             .meta_language(&doc)
-                            .unwrap_or(self.language.clone()),
+                            .unwrap_or_else(|| self.language.clone()),
                         doc,
                     };
                     articles.push(Ok(article));
@@ -300,7 +297,7 @@ impl<TExtractor: Extractor + Unpin> Stream for ArticleStream<TExtractor> {
                                 .paper
                                 .extractor
                                 .meta_language(&doc)
-                                .unwrap_or(self.paper.language.clone());
+                                .unwrap_or_else(|| self.paper.language.clone());
                             Ok(Article {
                                 url,
                                 doc,
@@ -493,7 +490,7 @@ impl DocumentDownloadState {
     pub fn success_document(self) -> std::result::Result<Document, ExtrablattError> {
         match self {
             DocumentDownloadState::NotRequested => Err(ExtrablattError::UrlError {
-                msg: format!("Not requested yet"),
+                msg: "Not requested yet".to_string(),
             }),
             DocumentDownloadState::Success { doc, .. } => Ok(doc),
             DocumentDownloadState::NoHttpSuccessResponse { response, .. } => {
@@ -779,9 +776,7 @@ impl ConfigBuilder {
             fetch_images: self.fetch_images.unwrap_or(true),
             max_image_dimension_ration: self.max_image_dimension_ration.unwrap_or((16, 9)),
             keep_article_html: self.keep_article_html.unwrap_or_default(),
-            browser_user_agent: self
-                .browser_user_agent
-                .unwrap_or_else(|| Config::user_agent()),
+            browser_user_agent: self.browser_user_agent.unwrap_or_else(Config::user_agent),
             request_timeout: self
                 .request_timeout
                 .unwrap_or_else(|| Duration::from_secs(Config::DEFAULT_REQ_TIMEOUT_SEC)),

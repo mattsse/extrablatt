@@ -1,8 +1,6 @@
-use extrablatt::{Language, NewspaperBuilder};
-use futures::{
-    pin_mut,
-    stream::{Stream, StreamExt},
-};
+use futures::{pin_mut, stream::StreamExt};
+
+use extrablatt::NewspaperBuilder;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

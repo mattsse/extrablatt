@@ -61,7 +61,7 @@ impl Language {
             Language::Greek,
             Language::Ukrainian,
         ];
-        LANGUAGES.into_iter()
+        LANGUAGES.iter()
     }
 
     pub fn identifier(&self) -> &str {
@@ -131,7 +131,7 @@ impl FromStr for Language {
     type Err = Language;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.as_ref() {
+        match s {
             "ar" | "arabic" => Ok(Language::Arabic),
             "ru" | "russian" => Ok(Language::Russian),
             "nl" | "dutch" => Ok(Language::Dutch),
