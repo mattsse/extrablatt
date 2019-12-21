@@ -1,3 +1,5 @@
+use crate::stopwords::*;
+use crate::text::{TextExtractor, WordsStats};
 use std::slice::Iter;
 use std::str::FromStr;
 
@@ -123,6 +125,61 @@ impl Language {
             Language::Greek => "Greek",
             Language::Ukrainian => "Ukrainian",
             Language::Other(s) => s.as_str(),
+        }
+    }
+
+    /// Counts the number of stopwords in the text, if stopwords for that
+    /// language are available.
+    pub fn stopword_count(&self, txt: &str) -> Option<WordsStats> {
+        if let Some(stopwords) = self.stopwords() {
+            let (word_count, stopword_count) = TextExtractor::words(txt).fold(
+                (0usize, 0usize),
+                |(word_count, mut stopword_count), word| {
+                    if stopwords.contains(&word) {
+                        stopword_count += 1;
+                    }
+
+                    (word_count + 1, stopword_count)
+                },
+            );
+            Some(WordsStats {
+                word_count,
+                stopword_count,
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Get the stopwords for a language.
+    pub fn stopwords(&self) -> Option<&[&str]> {
+        match self {
+            Language::Arabic => Some(&ARABIC_STOPWORDS),
+            Language::Russian => Some(&RUSSIAN_STOPWORDS),
+            Language::Dutch => Some(&DUTCH_STOPWORDS),
+            Language::German => Some(&GERMAN_STOPWORDS),
+            Language::English => Some(&ENGLISH_STOPWORDS),
+            Language::Spanish => Some(&SPANISH_STOPWORDS),
+            Language::French => Some(&FRENCH_STOPWORDS),
+            Language::Hebrew => Some(&HEBREW_STOPWORDS),
+            Language::Italian => Some(&ITALIAN_STOPWORDS),
+            Language::Korean => Some(&KOREAN_STOPWORDS),
+            Language::Norwegian => Some(&NORWEGIAN_STOPWORDS),
+            Language::Persian => Some(&PERSIAN_STOPWORDS),
+            Language::Polish => Some(&POLISH_STOPWORDS),
+            Language::Portuguese => Some(&PORTUGUESE_STOPWORDS),
+            Language::Swedish => Some(&SWEDISH_STOPWORDS),
+            Language::Hungarian => Some(&HUNGARIAN_STOPWORDS),
+            Language::Finnish => Some(&FINNISH_STOPWORDS),
+            Language::Danish => Some(&DANISH_STOPWORDS),
+            Language::Chinese => Some(&CHINESE_STOPWORDS),
+            Language::Indonesian => Some(&INDONESIAN_STOPWORDS),
+            Language::Vietnamese => Some(&VIETNAMESE_STOPWORDS),
+            Language::Swahili => Some(&SWAHILI_STOPWORDS),
+            Language::Turkish => Some(&TURKISH_STOPWORDS),
+            Language::Greek => Some(&GREEK_STOPWORDS),
+            Language::Ukrainian => Some(&UKRAINIAN_STOPWORDS),
+            Language::Other(_) => None,
         }
     }
 }

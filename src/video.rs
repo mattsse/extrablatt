@@ -56,16 +56,17 @@ impl<'a> VideoNode<'a> {
         }
     }
 
-    pub fn get_src_url(&self) -> Option<Result<Url, ParseError>> {
+    pub fn get_src_url(&self, base_url: Option<&Url>) -> Option<Result<Url, ParseError>> {
         if let Some(url) = self.get_src() {
-            Some(Url::parse(url))
+            let options = Url::options().base_url(base_url);
+            Some(options.parse(url))
         } else {
             None
         }
     }
 
-    pub fn get_provider(&self) -> Option<VideoProvider> {
-        if let Some(url) = self.get_src_url() {
+    pub fn get_provider(&self, base_url: Option<&Url>) -> Option<VideoProvider> {
+        if let Some(url) = self.get_src_url(base_url) {
             if let Ok(url) = url {
                 if let Some(host) = url.host_str() {
                     let provider = VideoProvider::from_host(host);

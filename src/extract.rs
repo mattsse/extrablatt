@@ -28,6 +28,7 @@ use crate::date::{ArticleDate, DateExtractor, RE_DATE_SEGMENTS_M_D_Y, RE_DATE_SE
 use crate::error::ExtrablattError;
 use crate::newspaper::Category;
 use crate::stopwords::CATEGORY_STOPWORDS;
+use crate::text::TextExtractor;
 use crate::video::VideoNode;
 use crate::Language;
 
@@ -195,6 +196,14 @@ pub trait Extractor {
             .next()
     }
 
+    /// Finds the href in the `<base>` tag.
+    fn base_url(&self, doc: &Document) -> Option<Url> {
+        doc.find(Name("base"))
+            .filter_map(|n| n.attr("href"))
+            .filter_map(|href| Url::parse(href).ok())
+            .next()
+    }
+
     /// Extract content language from meta tag.
     fn meta_language(&self, doc: &Document) -> Option<Language> {
         let mut unknown_lang = None;
@@ -250,8 +259,8 @@ pub trait Extractor {
     }
 
     /// Extract the 'top img' as specified by the website.
-    fn meta_img_url(&self, doc: &Document, base_url: &Url) -> Option<Url> {
-        let options = Url::options().base_url(Some(base_url));
+    fn meta_img_url(&self, doc: &Document, base_url: Option<&Url>) -> Option<Url> {
+        let options = Url::options().base_url(base_url);
 
         if let Some(meta) = self.meta_content(doc, Attr("property", "og:image")) {
             if let Ok(url) = options.parse(&*meta) {
@@ -301,6 +310,22 @@ pub trait Extractor {
             .unwrap_or_default()
     }
 
+    fn text<'a>(&self, doc: &'a Document, lang: Language) -> Option<Cow<'a, str>> {
+        if let Some(node) = self.text_node(doc, lang) {
+            node.as_text().map(Cow::Borrowed)
+        } else {
+            None
+        }
+    }
+
+    fn text_node<'a>(&self, doc: &'a Document, lang: Language) -> Option<Node<'a>> {
+        TextExtractor::calculate_best_node(doc, lang)
+    }
+
+    fn summary<'a>(&self, doc: &'a Document) -> Option<Cow<'a, str>> {
+        None
+    }
+
     /// Extract the `href` attribute for all `<a>` tags of the document.
     fn all_urls<'a>(&self, doc: &'a Document) -> Vec<Cow<'a, str>> {
         doc.find(Name("a"))
@@ -309,10 +334,12 @@ pub trait Extractor {
             .collect()
     }
 
-    fn article_urls(&self, doc: &Document, base_url: &Url) -> Vec<ArticleUrl> {
-        let options = Url::options().base_url(Some(base_url));
+    /// Finds all urls from the document that might point to an article.
+    fn article_urls(&self, doc: &Document, base_url: Option<&Url>) -> Vec<ArticleUrl> {
+        let options = Url::options().base_url(base_url);
 
-        doc.find(Name("a"))
+        let q = doc
+            .find(Name("a"))
             .filter_map(|n| {
                 if let Some(href) = n.attr("href").map(str::trim) {
                     Some((href, n.as_text().map(str::trim)))
@@ -325,16 +352,21 @@ pub trait Extractor {
                     .parse(link)
                     .map(|url| ArticleUrl::new_with_title(url, title))
                     .ok()
-            })
-            .filter(|article| Self::is_article(article, base_url))
-            .collect()
+            });
+        if let Some(base_url) = base_url {
+            q.filter(|article| Self::is_article(article, base_url))
+                .collect()
+        } else {
+            q.collect()
+        }
     }
 
     /// Extract all of the images of the document.
-    fn img_urls<'a>(&self, doc: &'a Document) -> Vec<Cow<'a, str>> {
+    fn image_urls(&self, doc: &Document, base_url: Option<&Url>) -> Vec<Url> {
+        let options = Url::options().base_url(base_url);
         doc.find(Name("img"))
             .filter_map(|n| n.attr("href").map(str::trim))
-            .map(Cow::Borrowed)
+            .filter_map(|url| options.parse(url).ok())
             .collect()
     }
 
@@ -497,8 +529,53 @@ pub trait Extractor {
             .collect()
     }
 
-    fn article_content<'a>(&self, doc: &'a Document) -> ArticleContent<'a> {
-        unimplemented!()
+    /// Gathers all items for an article from the document.
+    fn article_content<'a>(
+        &self,
+        doc: &'a Document,
+        base_url: Option<&Url>,
+        lang: Option<Language>,
+    ) -> ArticleContent<'a> {
+        let mut builder = ArticleContent::builder()
+            .authors(self.authors(doc))
+            .keywords(self.meta_keywords(doc))
+            .images(self.image_urls(doc, base_url));
+
+        let lang = if let Some(meta_lang) = self.meta_language(doc) {
+            builder = builder.language(meta_lang.clone());
+            meta_lang
+        } else {
+            lang.unwrap_or_default()
+        };
+
+        if let Some(text) = self.text(doc, lang.clone()) {
+            builder = builder.text(text);
+        }
+
+        builder = builder.videos(
+            self.videos(doc, Some(lang))
+                .into_iter()
+                .filter_map(|x| x.get_src_url(base_url))
+                .filter_map(|url| url.ok())
+                .collect(),
+        );
+
+        if let Some(description) = self.meta_description(doc) {
+            builder = builder.description(description);
+        }
+        if let Some(summary) = self.summary(doc) {
+            builder = builder.summary(summary);
+        }
+        if let Some(title) = self.title(doc) {
+            builder = builder.title(title);
+        }
+        if let Some(date) = self.publishing_date(doc, base_url) {
+            builder = builder.publishing_date(date);
+        }
+        if let Some(img) = self.meta_img_url(doc, base_url) {
+            builder = builder.top_image(img);
+        }
+        builder.build()
     }
 
     ///  Return the article's canonical URL
@@ -522,45 +599,42 @@ pub trait Extractor {
         None
     }
 
-    fn videos<'a>(&self, doc: &'a Document) -> Vec<VideoNode<'a>> {
-        let mut videos: Vec<_> = doc
-            .find(Name("iframe").or(Name("object").or(Name("video"))))
-            .map(VideoNode::new)
-            .collect();
+    fn videos<'a>(&self, doc: &'a Document, lang: Option<Language>) -> Vec<VideoNode<'a>> {
+        if let Some(node) = self.text_node(doc, lang.unwrap_or_default()) {
+            let mut videos: Vec<_> = node
+                .find(Name("iframe").or(Name("object").or(Name("video"))))
+                .map(VideoNode::new)
+                .collect();
 
-        videos.extend(
-            doc.find(Name("embed"))
-                .filter(|n| {
-                    if let Some(parent) = n.parent() {
-                        parent.name() != Some("object")
-                    } else {
-                        false
-                    }
-                })
-                .map(VideoNode::new),
-        );
-
-        videos
+            videos.extend(
+                node.find(Name("embed"))
+                    .filter(|n| {
+                        if let Some(parent) = n.parent() {
+                            parent.name() != Some("object")
+                        } else {
+                            false
+                        }
+                    })
+                    .map(VideoNode::new),
+            );
+            videos
+        } else {
+            Vec::new()
+        }
     }
 }
 
 pub fn count_dashes_and_underscores<T: AsRef<str>>(s: T) -> (usize, usize) {
     let s = s.as_ref();
-    let dash_count = s.chars().fold(0, |mut dashes, c| {
+    s.chars().fold((0, 0), |(dashes, unders), c| {
         if c == '-' {
-            dashes += 1;
+            (dashes + 1, unders)
+        } else if c == '_' {
+            (dashes, unders + 1)
+        } else {
+            (dashes, unders)
         }
-        dashes
-    });
-
-    let underscore_count = s.chars().fold(0, |mut dashes, c| {
-        if c == '_' {
-            dashes += 1;
-        }
-        dashes
-    });
-
-    (dash_count, underscore_count)
+    })
 }
 
 /// Checks whether the `url`'s domain contains at least the `base_url` domain as

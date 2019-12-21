@@ -8,7 +8,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let newspaper = NewspaperBuilder::new("https://cnn.com/")?.build().await?;
 
-    let stream = newspaper.into_stream().await;
+    let stream = newspaper.into_stream().await.take(3);
     pin_mut!(stream);
     while let Some(article) = stream.next().await {
         if let Ok(article) = article {

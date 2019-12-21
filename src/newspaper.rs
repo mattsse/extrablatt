@@ -81,7 +81,10 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
             DocumentDownloadState::Success { doc, .. } => Some(doc),
             _ => None,
         }) {
-            for article in self.extractor.article_urls(&category_doc, &self.base_url) {
+            for article in self
+                .extractor
+                .article_urls(&category_doc, Some(&self.base_url))
+            {
                 self.articles
                     .entry(article)
                     .or_insert(DocumentDownloadState::NotRequested);
@@ -142,7 +145,7 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
             let res = res.await;
 
             if let DocumentDownloadState::Success { doc, .. } = &res {
-                for url in self.extractor.article_urls(doc, &self.base_url) {
+                for url in self.extractor.article_urls(doc, Some(&self.base_url)) {
                     self.articles
                         .entry(url)
                         .or_insert(DocumentDownloadState::NotRequested);
@@ -199,7 +202,7 @@ impl<TExtractor: Extractor + Unpin> Newspaper<TExtractor> {
     /// Converts the newspaper into a stream, yielding all available
     /// [`extrablatt::Article`]s.
     ///
-    /// Fetches all available categories first, hence the `async`.
+    /// All available categories will be fetched first, hence the `async`.
     pub async fn into_stream(
         mut self,
     ) -> impl Stream<Item = std::result::Result<Article, ExtrablattError>> {
@@ -227,7 +230,14 @@ impl<TExtractor: Extractor + Unpin> Newspaper<TExtractor> {
                 }
                 DocumentDownloadState::Success { doc, .. } => {
                     let article = Article {
-                        content: self.extractor.article_content(&doc).into_owned(),
+                        content: self
+                            .extractor
+                            .article_content(
+                                &doc,
+                                Some(&self.base_url),
+                                Some(self.language.clone()),
+                            )
+                            .into_owned(),
                         url: article_url.url,
                         language: self
                             .extractor
@@ -292,7 +302,15 @@ impl<TExtractor: Extractor + Unpin> Stream for ArticleStream<TExtractor> {
                 let article = match resp {
                     Ok((url, body)) => {
                         if let Ok(doc) = Document::from_read(&*body) {
-                            let content = self.paper.extractor.article_content(&doc).into_owned();
+                            let content = self
+                                .paper
+                                .extractor
+                                .article_content(
+                                    &doc,
+                                    Some(&self.paper.base_url),
+                                    Some(self.paper.language.clone()),
+                                )
+                                .into_owned();
                             let language = self
                                 .paper
                                 .extractor

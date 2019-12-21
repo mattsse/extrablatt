@@ -13,6 +13,7 @@ use crate::error::ExtrablattError;
 use crate::extract::{DefaultExtractor, Extractor};
 use crate::language::Language;
 use crate::newspaper::Config;
+use std::fmt;
 
 pub const ALLOWED_FILE_EXT: [&str; 12] = [
     "html", "htm", "md", "rst", "aspx", "jsp", "rhtml", "cgi", "xhtml", "jhtml", "asp", "shtml",
@@ -228,7 +229,13 @@ impl ArticleBuilder {
         let doc = Document::from_read(&*resp.bytes().await?)
             .context(format!("Failed to read {:?} html as document.", url))?;
 
-        let content = extractor.article_content(&doc).into_owned();
+        let content = extractor
+            .article_content(
+                &doc,
+                extractor.base_url(&doc).as_ref(),
+                self.language.clone(),
+            )
+            .into_owned();
 
         Ok(Article {
             url,
@@ -243,8 +250,9 @@ impl ArticleBuilder {
 pub struct ArticleContent<'a> {
     pub authors: Option<Vec<Cow<'a, str>>>,
     pub title: Option<Cow<'a, str>>,
-    pub date: Option<ArticleDate>,
+    pub publishing_date: Option<ArticleDate>,
     pub keywords: Option<Vec<Cow<'a, str>>>,
+    pub description: Option<Cow<'a, str>>,
     pub summary: Option<Cow<'a, str>>,
     pub text: Option<Cow<'a, str>>,
     pub language: Option<Language>,
@@ -255,17 +263,23 @@ pub struct ArticleContent<'a> {
 }
 
 impl<'a> ArticleContent<'a> {
+    /// Convenience method to create a  [`ArticleContentBuilder`]
+    pub fn builder() -> ArticleContentBuilder<'a> {
+        ArticleContentBuilder::default()
+    }
+
     pub fn into_owned(self) -> ArticleContent<'static> {
         ArticleContent {
             authors: self
                 .authors
                 .map(|x| x.into_iter().map(Cow::into_owned).map(Cow::Owned).collect()),
             title: self.title.map(Cow::into_owned).map(Cow::Owned),
-            date: self.date,
+            publishing_date: self.publishing_date,
             keywords: self
                 .keywords
                 .map(|x| x.into_iter().map(Cow::into_owned).map(Cow::Owned).collect()),
             summary: self.summary.map(Cow::into_owned).map(Cow::Owned),
+            description: self.description.map(Cow::into_owned).map(Cow::Owned),
             text: self.text.map(Cow::into_owned).map(Cow::Owned),
             language: self.language,
             thumbnail: self.thumbnail,
@@ -280,9 +294,10 @@ impl<'a> ArticleContent<'a> {
 pub struct ArticleContentBuilder<'a> {
     pub authors: Option<Vec<Cow<'a, str>>>,
     pub title: Option<Cow<'a, str>>,
-    pub date: Option<ArticleDate>,
+    pub publishing_date: Option<ArticleDate>,
     pub keywords: Option<Vec<Cow<'a, str>>>,
     pub summary: Option<Cow<'a, str>>,
+    pub description: Option<Cow<'a, str>>,
     pub text: Option<Cow<'a, str>>,
     pub language: Option<Language>,
     pub thumbnail: Option<Url>,
@@ -302,8 +317,8 @@ impl<'a> ArticleContentBuilder<'a> {
         self
     }
 
-    pub fn date(mut self, date: ArticleDate) -> Self {
-        self.date = Some(date);
+    pub fn publishing_date(mut self, date: ArticleDate) -> Self {
+        self.publishing_date = Some(date);
         self
     }
 
@@ -314,6 +329,10 @@ impl<'a> ArticleContentBuilder<'a> {
 
     pub fn summary(mut self, summary: Cow<'a, str>) -> Self {
         self.summary = Some(summary);
+        self
+    }
+    pub fn description(mut self, description: Cow<'a, str>) -> Self {
+        self.description = Some(description);
         self
     }
 
@@ -351,8 +370,9 @@ impl<'a> ArticleContentBuilder<'a> {
         ArticleContent {
             authors: self.authors,
             title: self.title,
-            date: self.date,
+            publishing_date: self.publishing_date,
             keywords: self.keywords,
+            description: self.description,
             summary: self.summary,
             text: self.text,
             language: self.language,
@@ -361,5 +381,13 @@ impl<'a> ArticleContentBuilder<'a> {
             images: self.images,
             videos: self.videos,
         }
+    }
+}
+
+pub struct ArticleText {}
+
+impl fmt::Display for ArticleText {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        unimplemented!()
     }
 }
