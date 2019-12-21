@@ -6,6 +6,8 @@ use anyhow::{Context, Result};
 use reqwest::header::{HeaderMap, USER_AGENT};
 use reqwest::{Client, IntoUrl, RequestBuilder, Url};
 use select::document::Document;
+#[cfg(feature = "serde0")]
+use serde::{Deserialize, Serialize};
 use tokio::future::FutureExt;
 
 use crate::date::ArticleDate;
@@ -247,6 +249,7 @@ impl ArticleBuilder {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde0", derive(Serialize, Deserialize))]
 pub struct ArticleContent<'a> {
     pub authors: Option<Vec<Cow<'a, str>>>,
     pub title: Option<Cow<'a, str>>,

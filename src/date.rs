@@ -7,6 +7,8 @@ use regex::Regex;
 use select::document::Document;
 use select::node::Node;
 use select::predicate::{Attr, Name, Predicate};
+#[cfg(feature = "serde0")]
+use serde::{Deserialize, Serialize};
 
 use lazy_static::lazy_static;
 
@@ -79,6 +81,7 @@ lazy_static! {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde0", derive(Serialize, Deserialize))]
 pub enum Date {
     /// The ISO 8601 date, a pair of year, month and day of the year.
     Date(NaiveDate),
@@ -87,6 +90,7 @@ pub enum Date {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde0", derive(Serialize, Deserialize))]
 pub enum Update {
     /// The ISO 8601 date, a pair of year, month and day of the year.
     Date(NaiveDate),
@@ -97,6 +101,7 @@ pub enum Update {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde0", derive(Serialize, Deserialize))]
 pub struct ArticleDate {
     /// When the article was first published.
     pub published: Date,

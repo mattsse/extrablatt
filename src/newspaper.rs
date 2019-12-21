@@ -106,6 +106,7 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
             })
             .map(|url| {
                 self.client.get(url.clone()).send().then(|res| {
+                    // TODO check config
                     futures::future::ok::<_, ()>((url, DocumentDownloadState::from_response(res)))
                 })
             })
