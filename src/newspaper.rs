@@ -1,5 +1,6 @@
 use std::borrow::Borrow;
-use std::ops::DerefMut;
+use std::collections::hash_map::IntoIter;
+use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::process::Output;
@@ -92,87 +93,101 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
         }
     }
 
-    pub async fn get_all_articles(&mut self) -> Result<Vec<ArticleContent<'_>>> {
-        // join all futures
-        let futures: Vec<_> = self
-            .articles
-            .iter()
-            .filter_map(|(article, state)| {
-                if state.is_not_requested() {
-                    Some(article.url.clone())
-                } else {
-                    None
-                }
-            })
-            .map(|url| {
-                self.client.get(url.clone()).send().then(|res| {
-                    // TODO check config
-                    futures::future::ok::<_, ()>((url, DocumentDownloadState::from_response(res)))
+    pub async fn download_articles(&mut self) -> ArticleDownloadIter<'_, TExtractor> {
+        let results = join_all(
+            self.articles
+                .iter()
+                .filter_map(|(article, state)| {
+                    if state.is_not_requested() {
+                        Some(article.url.clone())
+                    } else {
+                        None
+                    }
                 })
-            })
-            .collect();
+                .map(|url| {
+                    self.client.get(url.clone()).send().then(|res| async {
+                        (url, DocumentDownloadState::from_response(res).await)
+                    })
+                }),
+        )
+        .await;
 
-        Ok(vec![])
+        for (url, doc) in results {
+            if self.config.http_success_only {
+                if doc.is_success() {
+                    *self.articles.get_mut(&url).unwrap() = doc;
+                }
+            } else {
+                *self.articles.get_mut(&url).unwrap() = doc;
+            }
+        }
+
+        ArticleDownloadIter {
+            inner: self.articles.iter(),
+            extractor: &self.extractor,
+            language: self.language.clone(),
+            base_url: &self.base_url,
+        }
     }
 
-    pub async fn get_all_categories(&mut self) -> Result<Vec<(Category, &DocumentDownloadState)>> {
-        // join all futures
-        let futures: Vec<_> = self
-            .categories
-            .iter()
-            .filter_map(|(cat, state)| {
-                if state.is_not_requested() {
-                    Some(cat)
-                } else {
-                    None
-                }
-            })
-            .map(|cat| {
-                let cat = cat.clone();
-                self.client.get(cat.url.clone()).send().then(|res| {
-                    futures::future::ok::<_, ()>((cat, DocumentDownloadState::from_response(res)))
-                })
-            })
-            .collect();
+    pub fn iter_articles(&self) -> impl Iterator<Item = (&ArticleUrl, ArticleContent<'_>)> {
+        self.articles.iter().filter_map(move |(url, doc)| {
+            if let DocumentDownloadState::Success { doc, .. } = doc {
+                Some((
+                    url,
+                    self.extractor.article_content(
+                        doc,
+                        Some(&self.base_url),
+                        Some(self.language.clone()),
+                    ),
+                ))
+            } else {
+                None
+            }
+        })
+    }
 
-        let mut requested_categories = Vec::with_capacity(futures.len());
+    pub async fn download_categories(
+        &mut self,
+    ) -> impl Iterator<Item = (&Category, &DocumentDownloadState)> {
+        // join all futures
+        let results = join_all(
+            self.categories
+                .iter()
+                .filter_map(|(cat, state)| {
+                    if state.is_not_requested() {
+                        Some(cat)
+                    } else {
+                        None
+                    }
+                })
+                .map(|cat| {
+                    let cat = cat.clone();
+                    self.client.get(cat.url.clone()).send().then(|res| async {
+                        (cat, DocumentDownloadState::from_response(res).await)
+                    })
+                }),
+        )
+        .await;
 
         // save to unwrap since all responses are wrapped in an `Ok`.
-        for (cat, res) in join_all(futures)
-            .await
-            .into_iter()
-            .map(std::result::Result::unwrap)
-        {
-            let res = res.await;
-
+        for (cat, res) in results {
             if let DocumentDownloadState::Success { doc, .. } = &res {
                 for url in self.extractor.article_urls(doc, Some(&self.base_url)) {
                     self.articles
                         .entry(url)
                         .or_insert(DocumentDownloadState::NotRequested);
                 }
+                *self.categories.get_mut(&cat).unwrap() = res;
             } else {
                 // don't insert if only successful responses are allowed
-                if self.config.http_success_only {
-                    continue;
+                if !self.config.http_success_only {
+                    *self.categories.get_mut(&cat).unwrap() = res;
                 }
             }
-
-            let state = self.categories.get_mut(&cat).unwrap();
-            *state = res;
-
-            requested_categories.push(cat);
         }
 
-        // TODO extract articles
-
-        let mut res = Vec::with_capacity(requested_categories.len());
-        for cat in requested_categories {
-            let state = self.categories.get(&cat).unwrap();
-            res.push((cat, state))
-        }
-
-        Ok(res)
+        vec![].into_iter()
     }
 
     /// Refresh the main page for the newspaper and returns the old document.
@@ -199,6 +214,16 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
     }
 }
 
+//impl<TExtractor: Extractor> IntoIterator for Newspaper<TExtractor> {
+//    type Item = std::result::Result<Article, ExtrablattError>;
+//    type IntoIter = std::slice::Iter<'static, std::result::Result<Article,
+// ExtrablattError>>;
+//
+//    fn into_iter(self) -> Self::IntoIter {
+//        panic!()
+//    }
+//}
+
 impl<TExtractor: Extractor + Unpin> Newspaper<TExtractor> {
     /// Converts the newspaper into a stream, yielding all available
     /// [`extrablatt::Article`]s.
@@ -207,7 +232,7 @@ impl<TExtractor: Extractor + Unpin> Newspaper<TExtractor> {
     pub async fn into_stream(
         mut self,
     ) -> impl Stream<Item = std::result::Result<Article, ExtrablattError>> {
-        let _ = self.get_all_categories().await;
+        let _ = self.download_categories().await;
 
         let mut articles = Vec::new();
         let mut responses = Vec::new();
@@ -267,10 +292,12 @@ impl<TExtractor: Extractor + Unpin> Newspaper<TExtractor> {
     }
 }
 
+type ArticleResponse =
+    Pin<Box<dyn Future<Output = std::result::Result<(Url, Bytes), reqwest::Error>>>>;
+
 pub struct ArticleStream<TExtractor: Extractor> {
     paper: Newspaper<TExtractor>,
-    responses:
-        Vec<Pin<Box<dyn Future<Output = std::result::Result<(Url, Bytes), reqwest::Error>>>>>,
+    responses: Vec<ArticleResponse>,
     articles: Vec<std::result::Result<Article, ExtrablattError>>,
 }
 
@@ -426,15 +453,12 @@ impl NewspaperBuilder {
     }
 }
 
+// TODO refactor Error State with `ExtrablattError`
+
 #[derive(Debug)]
 pub enum DocumentDownloadState {
     /// No request sent yet.
     NotRequested,
-    //    /// Waiting for a response for request sent at `started`
-    //    PendingResponse {
-    //        /// Timestamp the request was sent.
-    //        started: Instant,
-    //    },
     /// Received a success response at `received` and successfully parsed the
     /// html document.
     Success {
@@ -506,20 +530,18 @@ impl DocumentDownloadState {
         }
     }
 
-    pub fn success_document(self) -> std::result::Result<Document, ExtrablattError> {
+    pub fn success_document(self) -> Result<Document> {
         match self {
-            DocumentDownloadState::NotRequested => Err(ExtrablattError::UrlError {
-                msg: "Not requested yet".to_string(),
-            }),
+            DocumentDownloadState::NotRequested => Err(anyhow!("Not requested yet")),
             DocumentDownloadState::Success { doc, .. } => Ok(doc),
             DocumentDownloadState::NoHttpSuccessResponse { response, .. } => {
-                Err(ExtrablattError::NoHttpSuccessResponse { response })
+                Err(ExtrablattError::NoHttpSuccessResponse { response })?
             }
             DocumentDownloadState::HttpRequestFailure { error, .. } => {
-                Err(ExtrablattError::HttpRequestFailure { error })
+                Err(ExtrablattError::HttpRequestFailure { error })?
             }
             DocumentDownloadState::DocumentReadFailure { body, .. } => {
-                Err(ExtrablattError::ReadDocumentError { body })
+                Err(ExtrablattError::ReadDocumentError { body })?
             }
         }
     }
@@ -801,6 +823,45 @@ impl ConfigBuilder {
                 .unwrap_or_else(|| Duration::from_secs(Config::DEFAULT_REQ_TIMEOUT_SEC)),
             http_success_only: self.http_success_only.unwrap_or(true),
         }
+    }
+}
+
+pub struct ArticleDownloadIter<'a, T: Extractor> {
+    inner: std::collections::hash_map::Iter<'a, ArticleUrl, DocumentDownloadState>,
+    extractor: &'a T,
+    language: Language,
+    base_url: &'a Url,
+}
+
+impl<'a, T: Extractor> ArticleDownloadIter<'a, T> {
+    pub fn successes(self) -> impl Iterator<Item = (&'a ArticleUrl, ArticleContent<'a>)> + 'a {
+        let extractor = self.extractor;
+        let language = self.language;
+        let base_url = self.base_url;
+        self.inner.filter_map(move |(url, doc)| {
+            if let DocumentDownloadState::Success { doc, .. } = doc {
+                Some((
+                    url,
+                    extractor.article_content(doc, Some(base_url), Some(language.clone())),
+                ))
+            } else {
+                None
+            }
+        })
+    }
+}
+
+impl<'a, T: Extractor> Deref for ArticleDownloadIter<'a, T> {
+    type Target = std::collections::hash_map::Iter<'a, ArticleUrl, DocumentDownloadState>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<'a, T: Extractor> DerefMut for ArticleDownloadIter<'a, T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.inner
     }
 }
 

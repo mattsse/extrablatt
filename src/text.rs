@@ -1,18 +1,32 @@
-use crate::Language;
+use std::collections::HashMap;
+use std::fmt;
+use std::ops::Deref;
+
 use select::document::Document;
 use select::node::Node;
 use select::predicate::{Name, Predicate};
-use std::collections::HashMap;
 
-pub const PUNCTUATION: &'static str = r###",."'!?&-/:;()#$%*+<=>@[\]^_`{|}~"###;
+use crate::Language;
 
-/// Statistic about words for a text.
+pub const PUNCTUATION: &str = r###",."'!?&-/:;()#$%*+<=>@[\]^_`{|}~"###;
+
 #[derive(Debug, Clone)]
-pub struct WordsStats {
-    /// All the words.
-    pub word_count: usize,
-    /// All the stop words.
-    pub stopword_count: usize,
+pub struct TextNode<'a> {
+    inner: Node<'a>,
+}
+
+impl<'a> Deref for TextNode<'a> {
+    type Target = Node<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.inner
+    }
+}
+
+impl<'a> fmt::Display for TextNode<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        unimplemented!()
+    }
 }
 
 pub struct TextExtractor;
@@ -22,7 +36,7 @@ impl TextExtractor {
 
     pub const MAX_STEPSAWAY_FROM_NODE: usize = 3;
 
-    pub fn calculate_best_node(doc: &Document, lang: Language) -> Option<Node> {
+    pub fn calculate_best_node(doc: &Document, lang: Language) -> Option<TextNode> {
         let mut starting_boost = 1.0;
         let cnt = 0usize;
 
@@ -84,7 +98,7 @@ impl TextExtractor {
             }
         }
 
-        let mut index = nodes_scores.keys().map(|i| *i).next();
+        let mut index = nodes_scores.keys().copied().next();
         let mut top_score = 0;
         for (idx, (score, _)) in nodes_scores {
             if score > top_score {
@@ -93,7 +107,9 @@ impl TextExtractor {
             }
         }
 
-        index.map(|i| Node::new(doc, i).unwrap())
+        index.map(|i| TextNode {
+            inner: Node::new(doc, i).unwrap(),
+        })
     }
 
     /// Returns all nodes we want to search on like paragraphs and tables
@@ -146,7 +162,7 @@ impl TextExtractor {
 
             score >= 1.0
         } else {
-            return links.count() != 0;
+            links.count() != 0
         }
     }
 
@@ -160,4 +176,13 @@ impl TextExtractor {
 /// Whether the char is a punctuation.
 pub fn is_punctuation(c: char) -> bool {
     PUNCTUATION.contains(c)
+}
+
+/// Statistic about words for a text.
+#[derive(Debug, Clone)]
+pub struct WordsStats {
+    /// All the words.
+    pub word_count: usize,
+    /// All the stop words.
+    pub stopword_count: usize,
 }

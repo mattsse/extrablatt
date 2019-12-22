@@ -1,9 +1,11 @@
-use crate::stopwords::*;
-use crate::text::{TextExtractor, WordsStats};
-#[cfg(feature = "serde0")]
-use serde::{Deserialize, Serialize};
 use std::slice::Iter;
 use std::str::FromStr;
+
+#[cfg(feature = "serde0")]
+use serde::{Deserialize, Serialize};
+
+use crate::stopwords::*;
+use crate::text::{TextExtractor, WordsStats};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde0", derive(Serialize, Deserialize))]

@@ -28,7 +28,7 @@ use crate::date::{ArticleDate, DateExtractor, RE_DATE_SEGMENTS_M_D_Y, RE_DATE_SE
 use crate::error::ExtrablattError;
 use crate::newspaper::Category;
 use crate::stopwords::CATEGORY_STOPWORDS;
-use crate::text::TextExtractor;
+use crate::text::{TextExtractor, TextNode};
 use crate::video::VideoNode;
 use crate::Language;
 
@@ -117,6 +117,7 @@ impl<'a> Deref for MetaNode<'a> {
     }
 }
 
+/// Used to retrieve all valuable information from the [`select::Document`].
 pub trait Extractor {
     /// Extract the article title.
     ///
@@ -310,6 +311,7 @@ pub trait Extractor {
             .unwrap_or_default()
     }
 
+    /// Get the full text of the article.
     fn text<'a>(&self, doc: &'a Document, lang: Language) -> Option<Cow<'a, str>> {
         if let Some(node) = self.text_node(doc, lang) {
             node.as_text().map(Cow::Borrowed)
@@ -318,10 +320,12 @@ pub trait Extractor {
         }
     }
 
-    fn text_node<'a>(&self, doc: &'a Document, lang: Language) -> Option<Node<'a>> {
+    /// The [`select::Node`] that contains the article's text.
+    fn text_node<'a>(&self, doc: &'a Document, lang: Language) -> Option<TextNode<'a>> {
         TextExtractor::calculate_best_node(doc, lang)
     }
 
+    /// A summary of the article's text.
     fn summary<'a>(&self, doc: &'a Document) -> Option<Cow<'a, str>> {
         None
     }
@@ -599,6 +603,7 @@ pub trait Extractor {
         None
     }
 
+    /// All video content in the article.
     fn videos<'a>(&self, doc: &'a Document, lang: Option<Language>) -> Vec<VideoNode<'a>> {
         if let Some(node) = self.text_node(doc, lang.unwrap_or_default()) {
             let mut videos: Vec<_> = node

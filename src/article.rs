@@ -1,5 +1,7 @@
 use std::borrow::{Borrow, Cow};
+use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::ops::{Deref, DerefMut};
 use std::time::Duration;
 
 use anyhow::{Context, Result};
@@ -14,8 +16,7 @@ use crate::date::ArticleDate;
 use crate::error::ExtrablattError;
 use crate::extract::{DefaultExtractor, Extractor};
 use crate::language::Language;
-use crate::newspaper::Config;
-use std::fmt;
+use crate::newspaper::{Config, DocumentDownloadState};
 
 pub const ALLOWED_FILE_EXT: [&str; 12] = [
     "html", "htm", "md", "rst", "aspx", "jsp", "rhtml", "cgi", "xhtml", "jhtml", "asp", "shtml",
@@ -384,13 +385,5 @@ impl<'a> ArticleContentBuilder<'a> {
             images: self.images,
             videos: self.videos,
         }
-    }
-}
-
-pub struct ArticleText {}
-
-impl fmt::Display for ArticleText {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        unimplemented!()
     }
 }

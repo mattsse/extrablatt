@@ -4,12 +4,6 @@ use thiserror::Error;
 /// All different error types this crate uses.
 #[derive(Error, Debug)]
 pub enum ExtrablattError {
-    /// An error while operating with urls.
-    #[error("{msg}")]
-    UrlError {
-        /// The notification.
-        msg: String,
-    },
     /// Received a good non success Http response
     #[error("Expected a 2xx Success but got: {}", response.status())]
     NoHttpSuccessResponse {
