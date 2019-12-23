@@ -249,7 +249,6 @@ pub struct ArticleContent<'a> {
     pub publishing_date: Option<ArticleDate>,
     pub keywords: Option<Vec<Cow<'a, str>>>,
     pub description: Option<Cow<'a, str>>,
-    pub summary: Option<Cow<'a, str>>,
     pub text: Option<Cow<'a, str>>,
     pub language: Option<Language>,
     pub thumbnail: Option<Url>,
@@ -274,7 +273,6 @@ impl<'a> ArticleContent<'a> {
             keywords: self
                 .keywords
                 .map(|x| x.into_iter().map(Cow::into_owned).map(Cow::Owned).collect()),
-            summary: self.summary.map(Cow::into_owned).map(Cow::Owned),
             description: self.description.map(Cow::into_owned).map(Cow::Owned),
             text: self.text.map(Cow::into_owned).map(Cow::Owned),
             language: self.language,
@@ -292,7 +290,6 @@ pub struct ArticleContentBuilder<'a> {
     pub title: Option<Cow<'a, str>>,
     pub publishing_date: Option<ArticleDate>,
     pub keywords: Option<Vec<Cow<'a, str>>>,
-    pub summary: Option<Cow<'a, str>>,
     pub description: Option<Cow<'a, str>>,
     pub text: Option<Cow<'a, str>>,
     pub language: Option<Language>,
@@ -323,10 +320,6 @@ impl<'a> ArticleContentBuilder<'a> {
         self
     }
 
-    pub fn summary(mut self, summary: Cow<'a, str>) -> Self {
-        self.summary = Some(summary);
-        self
-    }
     pub fn description(mut self, description: Cow<'a, str>) -> Self {
         self.description = Some(description);
         self
@@ -369,7 +362,6 @@ impl<'a> ArticleContentBuilder<'a> {
             publishing_date: self.publishing_date,
             keywords: self.keywords,
             description: self.description,
-            summary: self.summary,
             text: self.text,
             language: self.language,
             thumbnail: self.thumbnail,

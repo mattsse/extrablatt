@@ -325,11 +325,6 @@ pub trait Extractor {
         TextExtractor::calculate_best_node(doc, lang)
     }
 
-    /// A summary of the article's text.
-    fn summary<'a>(&self, doc: &'a Document) -> Option<Cow<'a, str>> {
-        None
-    }
-
     /// Extract the `href` attribute for all `<a>` tags of the document.
     fn all_urls<'a>(&self, doc: &'a Document) -> Vec<Cow<'a, str>> {
         doc.find(Name("a"))
@@ -566,9 +561,6 @@ pub trait Extractor {
 
         if let Some(description) = self.meta_description(doc) {
             builder = builder.description(description);
-        }
-        if let Some(summary) = self.summary(doc) {
-            builder = builder.summary(summary);
         }
         if let Some(title) = self.title(doc) {
             builder = builder.title(title);
