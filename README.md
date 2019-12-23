@@ -18,7 +18,6 @@ Scraping is done using [select.rs]("https://github.com/utkarshkukreti/select.rs"
 * All image extraction
 * Keyword extraction
 * Author extraction
-* Summary extraction
 
 Adaptable for specific Newspapers via the `Extractor` trait.
 
@@ -28,7 +27,7 @@ Adaptable for specific Newspapers via the `Extractor` trait.
 Extract all Articles from a site.
 
 ````rust
-use extrablatt::{Language, NewspaperBuilder};
+use extrablatt::{Language, Newspaper};
 use futures::{
     pin_mut,
     stream::{Stream, StreamExt},
@@ -37,7 +36,7 @@ use futures::{
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
-    let newspaper = NewspaperBuilder::new("https://cnn.com/")?.build().await?;
+    let newspaper = Newspaper::builder("https://cnn.com/")?.build().await?;
 
     let stream = newspaper.into_stream().await;
     pin_mut!(stream);

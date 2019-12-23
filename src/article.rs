@@ -150,7 +150,6 @@ impl Article {
 pub struct ArticleBuilder {
     url: Option<Url>,
     timeout: Option<Duration>,
-    http_success_only: Option<bool>,
     language: Option<Language>,
     browser_user_agent: Option<String>,
 }
@@ -162,7 +161,6 @@ impl ArticleBuilder {
         Ok(ArticleBuilder {
             url: Some(url),
             timeout: None,
-            http_success_only: None,
             language: None,
             browser_user_agent: None,
         })
@@ -180,11 +178,6 @@ impl ArticleBuilder {
 
     pub fn language(mut self, language: Language) -> Self {
         self.language = Some(language);
-        self
-    }
-
-    pub fn http_success_only(mut self, http_success_only: bool) -> Self {
-        self.http_success_only = Some(http_success_only);
         self
     }
 
@@ -222,8 +215,7 @@ impl ArticleBuilder {
             .send()
             .await?;
 
-        let http_success_only = self.http_success_only.unwrap_or(true);
-        if http_success_only && !resp.status().is_success() {
+        if !resp.status().is_success() {
             let msg = format!("Unsuccessful request to {:?}", resp.url());
             return Err(ExtrablattError::NoHttpSuccessResponse { response: resp }).context(msg);
         }
