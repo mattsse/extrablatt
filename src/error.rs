@@ -1,5 +1,8 @@
 use bytes::Bytes;
 use thiserror::Error;
+use url::Url;
+
+use crate::article::{Article, ArticleContent};
 
 /// All different error types this crate uses.
 #[derive(Error, Debug)]
@@ -21,5 +24,14 @@ pub enum ExtrablattError {
     ReadDocumentError {
         /// The content the resulted in the error.
         body: Bytes,
+    },
+    /// Identified an article, but it's content doesn't fulfill the configured
+    /// requirements.
+    #[error("Found incomplete Article for {}", url)]
+    IncompleteArticle {
+        /// The found article and its content.
+        article: ArticleContent<'static>,
+        /// The url of the article.
+        url: Url,
     },
 }
