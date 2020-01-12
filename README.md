@@ -28,18 +28,15 @@ Extract all Articles from a site.
 
 ````rust
 use extrablatt::{Language, Newspaper};
-use futures::{
-    pin_mut,
-    stream::{Stream, StreamExt},
-};
+use futures::{StreamExt};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let newspaper = Newspaper::builder("https://cnn.com/")?.build().await?;
 
-    let stream = newspaper.into_stream().await;
-    pin_mut!(stream);
+    let mut stream = newspaper.into_stream().await;
+    
     while let Some(article) = stream.next().await {
         if let Ok(article) = article {
             println!("article '{:?}'", article.content.title)

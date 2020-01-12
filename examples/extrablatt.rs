@@ -1,4 +1,4 @@
-use futures::{pin_mut, stream::StreamExt};
+use futures::stream::StreamExt;
 
 use extrablatt::Newspaper;
 
@@ -8,11 +8,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let newspaper = Newspaper::builder("https://cnn.com/")?.build().await?;
 
-    let stream = newspaper.into_stream().await.take(3);
-    pin_mut!(stream);
+    let mut stream = newspaper.into_stream().skip(5).take(2);
     while let Some(article) = stream.next().await {
         if let Ok(article) = article {
-            println!("article '{:?}'", article.content.title)
+            dbg!((article.url, article.content));
         } else {
             println!("{:?}", article);
         }
