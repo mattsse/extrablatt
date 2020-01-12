@@ -70,16 +70,30 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
         &self.language
     }
 
+    /// The used to store and detect valid articles.
+    #[inline]
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
+
+    #[inline]
+    pub fn config_mut(&mut self) -> &mut Config {
+        &mut self.config
+    }
+
+    /// The extractor used to retrieve content for an article.
     #[inline]
     pub fn extractor(&self) -> &TExtractor {
         &self.extractor
     }
 
+    /// Iterator over all available categories.
     #[inline]
     pub fn categories(&self) -> impl Iterator<Item = &Category> {
         self.categories.keys()
     }
 
+    /// Insert all categories extracted from the main page.
     fn insert_new_categories(&mut self) {
         for category in self.extractor.categories(&self.main_page, &self.base_url) {
             self.categories
@@ -565,7 +579,7 @@ impl DocumentDownloadState {
         }
     }
 
-    pub fn is_failure_response(&self) -> bool {
+    pub fn is_no_http_success_response(&self) -> bool {
         match self {
             DocumentDownloadState::NoHttpSuccessResponse { .. } => true,
             _ => false,
@@ -602,6 +616,7 @@ impl Default for DocumentDownloadState {
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Category {
+    /// The address for the category website.
     pub url: Url,
 }
 
@@ -642,31 +657,23 @@ impl Borrow<str> for Category {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
     /// Number of word tokens in the text.
-    min_word_count: usize,
+    min_word_count: Option<usize>,
     /// Number of sentence tokens.
-    min_sentence_count: usize,
+    min_sentence_count: Option<usize>,
     /// Number of chars for the text's title.
-    max_title_len: usize,
+    max_title_len: Option<usize>,
     /// Number of chars for the text.
-    max_text_len: usize,
+    max_text_len: Option<usize>,
     /// Number of keywords for the text.
-    max_keywords: usize,
+    max_keywords: Option<usize>,
     /// Number of Authors.
-    max_authors: usize,
-    /// Number of chars of the summary.
-    max_summary_len: usize,
-    /// Number of sentences.
-    max_summary_sentences: usize,
+    max_authors: Option<usize>,
     /// Max. number of urls to cache for a news source.
     max_doc_cache: usize,
     /// Save articles.
     article_storage: Option<ArticleStore>,
-    /// Whether to extract images from the site.
-    fetch_images: bool,
-    /// Max ratio for height/width to extract. Ignore if greater.
-    max_image_dimension_ration: (usize, usize),
-    /// Whether to kee the html of the article.
-    keep_article_html: bool,
+    /// Whether to also capture non 2XX responses.
+    http_success_only: bool,
     /// The user-agent used for requests.
     browser_user_agent: String,
     /// Timeout for requests.
@@ -675,7 +682,7 @@ pub struct Config {
 
 impl Config {
     /// Default timeout for requests made inside `extrablatt`.
-    pub const DEFAULT_REQ_TIMEOUT_SEC: u64 = 7;
+    pub const DEFAULT_REQUEST_TIMEOUT_SEC: u64 = 30;
 
     /// Default user agent for `extrablatt`.
     #[inline]
@@ -710,20 +717,12 @@ pub struct ConfigBuilder {
     max_keywords: Option<usize>,
     /// Number of Authors.
     max_authors: Option<usize>,
-    /// Number of chars of the summary.
-    max_summary_len: Option<usize>,
-    /// Number of sentences.
-    max_summary_sentences: Option<usize>,
     /// Max. number of urls to cache for each news source.
     max_doc_cache: Option<usize>,
     /// Storage for articles.
     article_storage: Option<ArticleStore>,
-    /// Whether to extract images from the site.
-    fetch_images: Option<bool>,
-    /// Max ratio for width/height to extract. Ignore if greater.
-    max_image_dimension_ration: Option<(usize, usize)>,
-    /// Whether to kee the html of the article.
-    keep_article_html: Option<bool>,
+    /// Whether to also capture non 2XX responses.
+    http_success_only: Option<bool>,
     /// The user-agent used for requests.
     browser_user_agent: Option<String>,
     /// Timeout for requests.
@@ -760,16 +759,6 @@ impl ConfigBuilder {
         self
     }
 
-    pub fn max_summary_len(mut self, max_summary_len: usize) -> Self {
-        self.max_summary_len = Some(max_summary_len);
-        self
-    }
-
-    pub fn max_summary_sentences(mut self, max_summary_sentences: usize) -> Self {
-        self.max_summary_sentences = Some(max_summary_sentences);
-        self
-    }
-
     pub fn max_doc_cache(mut self, max_doc_cache: usize) -> Self {
         self.max_doc_cache = Some(max_doc_cache);
         self
@@ -780,18 +769,8 @@ impl ConfigBuilder {
         self
     }
 
-    pub fn fetch_images(mut self, fetch_images: bool) -> Self {
-        self.fetch_images = Some(fetch_images);
-        self
-    }
-
-    pub fn max_image_dimension_ration(mut self, width: usize, height: usize) -> Self {
-        self.max_image_dimension_ration = Some((width, height));
-        self
-    }
-
-    pub fn keep_article_html(mut self, keep_article_html: bool) -> Self {
-        self.keep_article_html = Some(keep_article_html);
+    pub fn http_success_only(mut self, keep_article_html: bool) -> Self {
+        self.http_success_only = Some(keep_article_html);
         self
     }
 
@@ -807,35 +786,57 @@ impl ConfigBuilder {
 
     pub fn build(self) -> Config {
         Config {
-            min_word_count: self.min_word_count.unwrap_or(300),
-            min_sentence_count: self.min_sentence_count.unwrap_or(7),
-            max_title_len: self.max_title_len.unwrap_or(200),
-            max_text_len: self.max_text_len.unwrap_or(100_000),
-            max_keywords: self.max_keywords.unwrap_or(35),
-            max_authors: self.max_authors.unwrap_or(10),
-            max_summary_len: self.max_summary_len.unwrap_or(5_000),
-            max_summary_sentences: self.max_summary_sentences.unwrap_or(5),
+            min_word_count: self.min_word_count,
+            min_sentence_count: self.min_sentence_count,
+            max_title_len: self.max_title_len,
+            max_text_len: self.max_text_len,
+            max_keywords: self.max_keywords,
+            max_authors: self.max_authors,
             max_doc_cache: self.max_doc_cache.unwrap_or(2_0000),
             article_storage: self.article_storage,
-            fetch_images: self.fetch_images.unwrap_or(true),
-            max_image_dimension_ration: self.max_image_dimension_ration.unwrap_or((16, 9)),
-            keep_article_html: self.keep_article_html.unwrap_or_default(),
+            http_success_only: self.http_success_only.unwrap_or(true),
             browser_user_agent: self.browser_user_agent.unwrap_or_else(Config::user_agent),
             request_timeout: self
                 .request_timeout
-                .unwrap_or_else(|| Duration::from_secs(Config::DEFAULT_REQ_TIMEOUT_SEC)),
+                .unwrap_or_else(|| Duration::from_secs(Config::DEFAULT_REQUEST_TIMEOUT_SEC)),
+        }
+    }
+
+    /// Pre sets some restrictions regarding the article content:
+    ///     * Word Count >= 300
+    ///     * Sentences >= 7
+    ///     * Text Length >= 100_000
+    pub fn with_restrictions() -> Self {
+        Self {
+            min_word_count: Some(300),
+            min_sentence_count: Some(7),
+            max_title_len: Some(200),
+            max_text_len: Some(100_000),
+            max_keywords: None,
+            max_authors: None,
+            max_doc_cache: Some(2_0000),
+            article_storage: None,
+            http_success_only: None,
+            browser_user_agent: None,
+            request_timeout: None,
         }
     }
 }
 
+/// Iterator over the downloaded articles.
 pub struct ArticleDownloadIter<'a, T: Extractor> {
+    /// Each found url for an article paired with the result of it's request.
     inner: std::collections::hash_map::Iter<'a, ArticleUrl, DocumentDownloadState>,
+    /// The `Extractor` used to get the article's content.
     extractor: &'a T,
+    /// Language of the news source.
     language: Language,
+    /// Base url of the news source.
     base_url: &'a Url,
 }
 
 impl<'a, T: Extractor> ArticleDownloadIter<'a, T> {
+    /// All successfully retrieved Articles.
     pub fn successes(self) -> impl Iterator<Item = (&'a ArticleUrl, ArticleContent<'a>)> + 'a {
         let extractor = self.extractor;
         let language = self.language;
