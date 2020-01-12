@@ -59,6 +59,7 @@ impl Newspaper<DefaultExtractor> {
 }
 
 impl<TExtractor: Extractor> Newspaper<TExtractor> {
+    /// Clear all cached articles and categories.
     #[inline]
     pub fn clear(&mut self) {
         self.articles.clear();
@@ -102,8 +103,9 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
         }
     }
 
-    // TODO check cache restrictions
-    fn insert_new_articles(&mut self) {
+    /// For each successfully downloaded category document, insert their article
+    /// urls as unrequested.
+    fn insert_new_outstanding_articles(&mut self) {
         for category_doc in self.categories.values().filter_map(|doc| match doc {
             DocumentDownloadState::Success { doc, .. } => Some(doc),
             _ => None,
@@ -121,6 +123,25 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
         }
     }
 
+    /// Download and store all outstanding articles and returns an iterator over
+    /// their results.
+    ///
+    /// # Example
+    ///
+    /// Loop over all downloaded articles.
+    ///
+    /// ```edition2018
+    /// # use extrablatt::Newspaper;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let mut newspaper = Newspaper::builder("https://cnn.com/")?.build().await?;
+    ///     newspaper.download_outstanding_categories().await?;
+    ///     for(url, content) in newspaper.download_articles().await.successes() {
+    ///         // ...
+    ///     }
+    /// #   Ok(())
+    /// # }
+    /// ```
     pub async fn download_articles(&mut self) -> ArticleDownloadIter<'_, TExtractor> {
         let results = stream::iter(
             self.articles
@@ -577,6 +598,7 @@ impl NewspaperBuilder {
         self
     }
 
+    /// Create a new builder with a specific extractor.
     pub async fn build_with_extractor<TExtractor: Extractor>(
         self,
         extractor: TExtractor,
