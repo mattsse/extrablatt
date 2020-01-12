@@ -429,6 +429,8 @@ impl<TExtractor: Extractor + Unpin> Newspaper<TExtractor> {
 type PaperResponse =
     Pin<Box<dyn Future<Output = std::result::Result<(Url, Bytes), ExtrablattError>>>>;
 
+type ReadyResponse = (usize, std::result::Result<(Url, Bytes), ExtrablattError>);
+
 /// Stream for getting a `Article` each at a time.
 #[must_use = "streams do nothing unless polled"]
 pub struct ArticleStream<TExtractor: Extractor> {
@@ -463,7 +465,7 @@ impl<TExtractor: Extractor + Unpin> ArticleStream<TExtractor> {
     fn find_ready_response(
         items: &mut [PaperResponse],
         cx: &mut core::task::Context<'_>,
-    ) -> Option<(usize, std::result::Result<(Url, Bytes), ExtrablattError>)> {
+    ) -> Option<ReadyResponse> {
         items
             .iter_mut()
             .enumerate()

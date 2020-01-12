@@ -30,7 +30,7 @@ pub enum ExtrablattError {
     #[error("Found incomplete Article for {}", url)]
     IncompleteArticle {
         /// The found article and its content.
-        article: ArticleContent<'static>,
+        article: Box<ArticleContent<'static>>,
         /// The url of the article.
         url: Url,
     },
