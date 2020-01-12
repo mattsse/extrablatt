@@ -63,6 +63,7 @@ impl<'a> NodeValueQuery<'a> {
     }
 }
 
+/// Represents `<meta>` `[select::Node]` in a `[select::Document]`.
 pub struct MetaNode<'a> {
     inner: Node<'a>,
 }
@@ -72,18 +73,22 @@ impl<'a> MetaNode<'a> {
         self.inner.attr(attr)
     }
 
+    /// Value of the `name` attribute in the node.
     pub fn name_attr(&self) -> Option<&str> {
         self.attr("name")
     }
 
+    /// Value of the `property` attribute in the node.
     pub fn property_attr(&self) -> Option<&str> {
         self.attr("property")
     }
 
+    /// Value of the `content` attribute in the node.
     pub fn content_attr(&self) -> Option<&str> {
         self.attr("content")
     }
 
+    /// Value of the `value` attribute in the node.
     pub fn value_attr(&self) -> Option<&str> {
         self.attr("value")
     }
@@ -117,7 +122,7 @@ impl<'a> Deref for MetaNode<'a> {
     }
 }
 
-/// Used to retrieve all valuable information from the [`select::Document`].
+/// Used to retrieve all valuable information from a [`select::Document`].
 pub trait Extractor {
     /// Extract the article title.
     ///
@@ -327,8 +332,10 @@ pub trait Extractor {
 
     /// Extract the `href` attribute for all `<a>` tags of the document.
     fn all_urls<'a>(&self, doc: &'a Document) -> Vec<Cow<'a, str>> {
+        let mut uniques = HashSet::new();
         doc.find(Name("a"))
             .filter_map(|n| n.attr("href").map(str::trim))
+            .filter(|href| uniques.insert(*href))
             .map(Cow::Borrowed)
             .collect()
     }
@@ -336,7 +343,7 @@ pub trait Extractor {
     /// Finds all urls from the document that might point to an article.
     fn article_urls(&self, doc: &Document, base_url: Option<&Url>) -> Vec<ArticleUrl> {
         let options = Url::options().base_url(base_url);
-
+        let mut uniques = HashSet::new();
         let q = doc
             .find(Name("a"))
             .filter_map(|n| {
@@ -346,6 +353,7 @@ pub trait Extractor {
                     None
                 }
             })
+            .filter(|(href, _)| uniques.insert(*href))
             .filter_map(|(link, title)| {
                 options
                     .parse(link)
@@ -454,7 +462,7 @@ pub trait Extractor {
             }
         }
 
-        // check fo dates
+        // check for dates
         if RE_DATE_SEGMENTS_Y_M_D.is_match(article.url.path()) {
             return true;
         }
@@ -475,7 +483,7 @@ pub trait Extractor {
     }
 
     fn is_category(category: &Category, base_url: &Url) -> bool {
-        if category.url.as_str().starts_with('#') {
+        if category.url.path().starts_with("/#") {
             debug!(
                 "Ignoring category url starting with '#': {:?}",
                 category.url
@@ -574,7 +582,7 @@ pub trait Extractor {
         builder.build()
     }
 
-    ///  Return the article's canonical URL
+    /// Return the article's canonical URL
     ///
     /// Gets the first available value of:
     ///   1. The rel=canonical tag
@@ -621,7 +629,7 @@ pub trait Extractor {
     }
 }
 
-pub fn count_dashes_and_underscores<T: AsRef<str>>(s: T) -> (usize, usize) {
+fn count_dashes_and_underscores<T: AsRef<str>>(s: T) -> (usize, usize) {
     let s = s.as_ref();
     s.chars().fold((0, 0), |(dashes, unders), c| {
         if c == '-' {
@@ -636,7 +644,7 @@ pub fn count_dashes_and_underscores<T: AsRef<str>>(s: T) -> (usize, usize) {
 
 /// Checks whether the `url`'s domain contains at least the `base_url` domain as
 /// a subdomain.
-pub fn is_valid_domain(url: &Url, base_url: &Url) -> bool {
+fn is_valid_domain(url: &Url, base_url: &Url) -> bool {
     // check for subdomains
     if let Some(Host::Domain(domain)) = url.host() {
         let base_subdomains = base_url.domain().map(|x| x.split('.').collect::<Vec<_>>());
@@ -664,6 +672,8 @@ pub fn is_valid_domain(url: &Url, base_url: &Url) -> bool {
     false
 }
 
+/// An Extractor that only uses the default implementation in the `Extractor`
+/// trait.
 #[derive(Debug, Default)]
 pub struct DefaultExtractor;
 
@@ -731,6 +741,7 @@ mod tests {
                "https://extrablatt.com/2019/12/06/uk/some-longer-title-with-dashes/index.html",
                "https://www.extrablatt.com/politik/some-longer-title-with-dashes-interview-1.347823?reduced=true",
                "https://www.extrablatt.com/auto/some_longer_title_with_underscores_1300105.html",
+                "https://extrablatt.com/hmm-some-very-long-title-speparated",
         );
     }
 }

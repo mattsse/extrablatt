@@ -5,12 +5,12 @@ use std::ops::{Deref, DerefMut};
 use std::time::Duration;
 
 use anyhow::{Context, Result};
+use futures::future::FutureExt;
 use reqwest::header::{HeaderMap, USER_AGENT};
 use reqwest::{Client, IntoUrl, RequestBuilder, Url};
 use select::document::Document;
 #[cfg(feature = "serde0")]
 use serde::{Deserialize, Serialize};
-use tokio::future::FutureExt;
 
 use crate::date::ArticleDate;
 use crate::error::ExtrablattError;
@@ -18,10 +18,12 @@ use crate::extract::{DefaultExtractor, Extractor};
 use crate::language::Language;
 use crate::newspaper::{Config, DocumentDownloadState};
 
+/// Extension for documents that are considered valid sources for articles.
 pub const ALLOWED_FILE_EXT: [&str; 12] = [
     "html", "htm", "md", "rst", "aspx", "jsp", "rhtml", "cgi", "xhtml", "jhtml", "asp", "shtml",
 ];
 
+/// Segments in an url path that usually point to valid articles.
 pub const GOOD_SEGMENTS: [&str; 15] = [
     "story",
     "article",
@@ -40,6 +42,7 @@ pub const GOOD_SEGMENTS: [&str; 15] = [
     "investigations",
 ];
 
+/// Segments in an url path that usually point to invalid articles.
 pub const BAD_SEGMENTS: [&str; 17] = [
     "careers",
     "contact",
@@ -60,6 +63,7 @@ pub const BAD_SEGMENTS: [&str; 17] = [
     "admin",
 ];
 
+/// Domain names that are treated as bad sources for articles.
 pub const BAD_DOMAINS: [&str; 4] = ["amazon", "doubleclick", "twitter", "outbrain"];
 
 #[derive(Debug, Clone)]
@@ -126,13 +130,14 @@ impl Borrow<Url> for ArticleUrl {
     }
 }
 
+/// A full representation of a news article.
 #[derive(Debug)]
 pub struct Article {
     /// The url of the article.
     pub url: Url,
     /// The parsed response html `Document`.
     pub doc: Document,
-    /// The content of the article.
+    /// The extracted content of the article.
     pub content: ArticleContent<'static>,
     /// The expected language of the article.
     pub language: Language,
@@ -195,7 +200,7 @@ impl ArticleBuilder {
 
         let timeout = self
             .timeout
-            .unwrap_or_else(|| Duration::from_secs(Config::DEFAULT_REQ_TIMEOUT_SEC));
+            .unwrap_or_else(|| Duration::from_secs(Config::DEFAULT_REQUEST_TIMEOUT_SEC));
 
         let mut headers = HeaderMap::with_capacity(1);
 
@@ -247,14 +252,14 @@ pub struct ArticleContent<'a> {
     pub authors: Option<Vec<Cow<'a, str>>>,
     pub title: Option<Cow<'a, str>>,
     pub publishing_date: Option<ArticleDate>,
-    pub keywords: Option<Vec<Cow<'a, str>>>,
+    pub keywords: Vec<Cow<'a, str>>,
     pub description: Option<Cow<'a, str>>,
     pub text: Option<Cow<'a, str>>,
     pub language: Option<Language>,
     pub thumbnail: Option<Url>,
     pub top_image: Option<Url>,
-    pub images: Option<Vec<Url>>,
-    pub videos: Option<Vec<Url>>,
+    pub images: Vec<Url>,
+    pub videos: Vec<Url>,
 }
 
 impl<'a> ArticleContent<'a> {
@@ -272,7 +277,10 @@ impl<'a> ArticleContent<'a> {
             publishing_date: self.publishing_date,
             keywords: self
                 .keywords
-                .map(|x| x.into_iter().map(Cow::into_owned).map(Cow::Owned).collect()),
+                .into_iter()
+                .map(Cow::into_owned)
+                .map(Cow::Owned)
+                .collect(),
             description: self.description.map(Cow::into_owned).map(Cow::Owned),
             text: self.text.map(Cow::into_owned).map(Cow::Owned),
             language: self.language,
@@ -360,14 +368,14 @@ impl<'a> ArticleContentBuilder<'a> {
             authors: self.authors,
             title: self.title,
             publishing_date: self.publishing_date,
-            keywords: self.keywords,
+            keywords: self.keywords.unwrap_or_default(),
             description: self.description,
             text: self.text,
             language: self.language,
             thumbnail: self.thumbnail,
             top_image: self.top_image,
-            images: self.images,
-            videos: self.videos,
+            images: self.images.unwrap_or_default(),
+            videos: self.videos.unwrap_or_default(),
         }
     }
 }
