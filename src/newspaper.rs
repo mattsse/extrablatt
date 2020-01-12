@@ -8,10 +8,10 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use fnv::{FnvHashMap, FnvHashSet};
-use futures::future::{join_all, select_all, SelectAll};
-use futures::stream::{FuturesUnordered, Stream};
-use futures::task::Poll;
-use futures::{Future, FutureExt, StreamExt, TryFutureExt};
+use futures::future::SelectAll;
+use futures::stream::{self, BufferUnordered, FuturesUnordered, Stream};
+use futures::task::{Poll, Spawn};
+use futures::{Future, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use reqwest::header::{HeaderMap, USER_AGENT};
 use reqwest::{Body, Error, Response};
 use reqwest::{Client, ClientBuilder, IntoUrl, StatusCode, Url};
@@ -235,40 +235,28 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
 
     #[cfg(feature = "archive")]
     pub fn archive(&self) {
-        unimplemented!("coming as soon as reqwest 0.10 is stabilized.")
+        unimplemented!("coming as soon as reqwest 0.10 is stabilized and archiveis crate is updated to async/await")
     }
 
+    /// Execute a GET request and return the response wrapped in
+    /// [`DocumentDownloadState`].
     async fn get_document(
         &self,
         url: Url,
-    ) -> std::result::Result<DocumentDownloadState, (DocumentDownloadState, ExtrablattError)> {
+    ) -> std::result::Result<(Document, Instant), (DocumentDownloadState, ExtrablattError)> {
         let resp = self.client.get(url).send().await;
         DocumentDownloadState::from_response(resp).await
     }
 }
 
-//impl<TExtractor: Extractor> IntoIterator for Newspaper<TExtractor> {
-//    type Item = std::result::Result<Article, ExtrablattError>;
-//    type IntoIter = std::slice::Iter<'static, std::result::Result<Article,
-// ExtrablattError>>;
-//
-//    fn into_iter(self) -> Self::IntoIter {
-//        unimplemented!()
-//    }
-//}
-
 impl<TExtractor: Extractor + Unpin> Newspaper<TExtractor> {
     /// Converts the newspaper into a stream, yielding all available
     /// [`extrablatt::Article`]s.
-    ///
-    /// All available categories will be fetched first, hence the `async`.
-    pub async fn into_stream(
+    pub fn into_stream(
         mut self,
     ) -> impl Stream<Item = std::result::Result<Article, ExtrablattError>> {
-        let _ = self.download_categories().await;
-
         let mut articles = Vec::new();
-        let mut responses = Vec::new();
+        let mut article_responses = Vec::new();
 
         let mut extracted = FnvHashMap::default();
         std::mem::swap(&mut extracted, &mut self.articles);
@@ -276,16 +264,7 @@ impl<TExtractor: Extractor + Unpin> Newspaper<TExtractor> {
         for (article_url, doc) in extracted.into_iter() {
             match doc {
                 DocumentDownloadState::NotRequested => {
-                    let x: Pin<Box<dyn Future<Output = _>>> = self
-                        .client
-                        .get(article_url.url.clone())
-                        .send()
-                        .and_then(|resp| async {
-                            resp.bytes().await.map(|bytes| (article_url.url, bytes))
-                        })
-                        .boxed();
-
-                    responses.push(x);
+                    article_responses.push(self.get_response(article_url.url));
                 }
                 DocumentDownloadState::Success { doc, .. } => {
                     let article = Article {
@@ -309,21 +288,99 @@ impl<TExtractor: Extractor + Unpin> Newspaper<TExtractor> {
                 _ => {}
             }
         }
+
+        let mut categories = Vec::new();
+        let mut category_responses = Vec::new();
+        let mut extracted = FnvHashMap::default();
+        std::mem::swap(&mut extracted, &mut self.categories);
+
+        for (cat, doc) in extracted {
+            match doc {
+                DocumentDownloadState::NotRequested => {
+                    category_responses.push(self.get_response(cat.url));
+                }
+                DocumentDownloadState::Success { doc, .. } => {
+                    categories.push((cat, doc));
+                }
+                _ => {}
+            }
+        }
+
         ArticleStream {
             paper: self,
-            responses,
+            article_responses,
             articles,
+            categories,
+            category_responses,
         }
+    }
+
+    fn get_response(&self, url: Url) -> PaperResponse {
+        self.client
+            .get(url.clone())
+            .send()
+            .map_err(|error| ExtrablattError::HttpRequestFailure { error })
+            .and_then(|response| async {
+                if !response.status().is_success() {
+                    Err(ExtrablattError::NoHttpSuccessResponse { response })
+                } else {
+                    response
+                        .bytes()
+                        .await
+                        .map(|bytes| (url, bytes))
+                        .map_err(|error| ExtrablattError::HttpRequestFailure { error })
+                }
+            })
+            .boxed()
     }
 }
 
-type ArticleResponse =
-    Pin<Box<dyn Future<Output = std::result::Result<(Url, Bytes), reqwest::Error>>>>;
+type PaperResponse =
+    Pin<Box<dyn Future<Output = std::result::Result<(Url, Bytes), ExtrablattError>>>>;
 
+/// Stream for getting a `Article` each at a time.
+#[must_use = "streams do nothing unless polled"]
 pub struct ArticleStream<TExtractor: Extractor> {
+    /// The origin newspaper.
     paper: Newspaper<TExtractor>,
-    responses: Vec<ArticleResponse>,
+    /// Pending responses for an Article html.
+    article_responses: Vec<PaperResponse>,
+    /// Pending responses for Category html.
+    category_responses: Vec<PaperResponse>,
+    /// Articles already available.
     articles: Vec<Article>,
+    /// Categories already available.
+    categories: Vec<(Category, Document)>,
+}
+
+impl<TExtractor: Extractor + Unpin> ArticleStream<TExtractor> {
+    /// Queue in new requests for articles.
+    fn queue_category_articles(&mut self, doc: &Document) {
+        for article_url in self
+            .paper
+            .extractor
+            .article_urls(&doc, Some(&self.paper.base_url))
+            .into_iter()
+        {
+            self.article_responses
+                .push(self.paper.get_response(article_url.url));
+        }
+    }
+
+    /// Poll each item and return the index together with the response of first
+    /// ready future.
+    fn find_ready_response(
+        items: &mut [PaperResponse],
+        cx: &mut core::task::Context<'_>,
+    ) -> Option<(usize, std::result::Result<(Url, Bytes), ExtrablattError>)> {
+        items
+            .iter_mut()
+            .enumerate()
+            .find_map(|(i, f)| match f.as_mut().poll(cx) {
+                Poll::Pending => None,
+                Poll::Ready(resp) => Some((i, resp)),
+            })
+    }
 }
 
 impl<TExtractor: Extractor + Unpin> Stream for ArticleStream<TExtractor> {
@@ -333,25 +390,50 @@ impl<TExtractor: Extractor + Unpin> Stream for ArticleStream<TExtractor> {
         mut self: Pin<&mut Self>,
         cx: &mut core::task::Context<'_>,
     ) -> Poll<Option<Self::Item>> {
-        if let Some(ready) = self.articles.pop() {
-            return Poll::Ready(Some(Ok(ready)));
+        if let Some(article) = self.articles.pop() {
+            return Poll::Ready(Some(Ok(article)));
         }
-        if self.responses.is_empty() {
-            return Poll::Ready(None);
+        if self.article_responses.is_empty() {
+            if let Some((_, doc)) = self.categories.pop() {
+                // add futures to article_response
+                self.queue_category_articles(&doc);
+            }
+
+            if self.category_responses.is_empty() {
+                // nothing do anymore
+                return Poll::Ready(None);
+            }
+
+            // poll pending category futures to get new article futures
+            let item = Self::find_ready_response(&mut self.category_responses, cx);
+
+            match item {
+                Some((idx, resp)) => {
+                    let _ = self.category_responses.swap_remove(idx);
+                    match resp {
+                        Ok((url, body)) => {
+                            if let Ok(doc) = Document::from_read(&*body) {
+                                self.queue_category_articles(&doc);
+                            } else {
+                                return Poll::Ready(Some(Err(
+                                    ExtrablattError::ReadDocumentError { body },
+                                )));
+                            }
+                        }
+                        Err(e) => {
+                            return Poll::Ready(Some(Err(e)));
+                        }
+                    }
+                }
+                None => return Poll::Pending,
+            }
         }
 
-        let item =
-            self.responses
-                .iter_mut()
-                .enumerate()
-                .find_map(|(i, f)| match f.as_mut().poll(cx) {
-                    Poll::Pending => None,
-                    Poll::Ready(resp) => Some((i, resp)),
-                });
+        let item = Self::find_ready_response(&mut self.article_responses, cx);
 
         match item {
             Some((idx, resp)) => {
-                let _ = self.responses.swap_remove(idx);
+                let _ = self.article_responses.swap_remove(idx);
                 let article = match resp {
                     Ok((url, body)) => {
                         if let Ok(doc) = Document::from_read(&*body) {
@@ -369,6 +451,8 @@ impl<TExtractor: Extractor + Unpin> Stream for ArticleStream<TExtractor> {
                                 .extractor
                                 .meta_language(&doc)
                                 .unwrap_or_else(|| self.paper.language.clone());
+
+                            // TODO check completeness
                             Ok(Article {
                                 url,
                                 doc,
@@ -379,13 +463,21 @@ impl<TExtractor: Extractor + Unpin> Stream for ArticleStream<TExtractor> {
                             Err(ExtrablattError::ReadDocumentError { body })
                         }
                     }
-                    Err(error) => Err(ExtrablattError::HttpRequestFailure { error }),
+                    Err(error) => Err(error),
                 };
-
                 Poll::Ready(Some(article))
             }
             None => Poll::Pending,
         }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (
+            self.articles
+                .len()
+                .saturating_add(self.article_responses.len()),
+            None,
+        )
     }
 }
 
