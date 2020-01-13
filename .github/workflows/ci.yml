@@ -55,7 +55,7 @@ jobs:
     - name: Install Rust
       uses: hecrj/setup-rust-action@v1
       with:
-        rust-version: stable
+        rust-version: nightly
     - name: Install rustfmt
       run: rustup component add rustfmt
     - name: Check formatting
