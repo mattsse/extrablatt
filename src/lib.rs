@@ -2,7 +2,7 @@
 
 pub use extract::{DefaultExtractor, Extractor};
 pub use language::Language;
-pub use newspaper::{Config, Newspaper, NewspaperBuilder};
+pub use newspaper::{ArticleStream, Category, Config, Newspaper, NewspaperBuilder};
 
 pub mod article;
 pub mod clean;

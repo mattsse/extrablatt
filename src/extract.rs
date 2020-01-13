@@ -63,7 +63,7 @@ impl<'a> NodeValueQuery<'a> {
     }
 }
 
-/// Represents `<meta>` `[select::Node]` in a `[select::Document]`.
+/// Represents `<meta>` [`select::Node`] in a [`select::Document`].
 pub struct MetaNode<'a> {
     inner: Node<'a>,
 }

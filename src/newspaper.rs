@@ -49,9 +49,9 @@ pub struct Newspaper<TExtractor: Extractor = DefaultExtractor> {
 }
 
 impl Newspaper<DefaultExtractor> {
-    /// Convenience method for creating a new [`NewspaperBuilder`]
+    /// Convenience method for creating a new [`NewspaperBuilder`].
     ///
-    /// Same as calling [`NewspaperBuilder::new`]
+    /// Same as calling [`NewspaperBuilder::new`].
     #[inline]
     pub fn builder<T: IntoUrl>(url: T) -> Result<NewspaperBuilder> {
         NewspaperBuilder::new(url)
@@ -324,11 +324,6 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
         Ok(std::mem::replace(&mut self.main_page, main_page))
     }
 
-    #[cfg(feature = "archive")]
-    pub fn archive(&self) {
-        unimplemented!("coming as soon as reqwest 0.10 is stabilized and archiveis crate is updated to async/await")
-    }
-
     /// Execute a GET request and return the response wrapped in
     /// [`DocumentDownloadState`].
     async fn get_document(
@@ -337,6 +332,11 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
     ) -> std::result::Result<(Document, Instant), (DocumentDownloadState, ExtrablattError)> {
         let resp = self.client.get(url).send().await;
         DocumentDownloadState::from_response(resp).await
+    }
+
+    #[cfg(feature = "archive")]
+    pub fn archive(&self) {
+        unimplemented!("coming as soon as reqwest 0.10 is stabilized and archiveis crate is updated to async/await")
     }
 }
 
@@ -447,6 +447,57 @@ pub struct ArticleStream<TExtractor: Extractor> {
 }
 
 impl<TExtractor: Extractor + Unpin> ArticleStream<TExtractor> {
+    /// Fetch all article urls from the page the url points to and
+    /// return a new stream of articles using the
+    /// [`extrablatt::DefaultExtractor`].
+    ///
+    /// # Example
+    ///
+    /// Create a new [`extrablatt::ArticleStream`] that yields all articles
+    /// referenced on `https:://example.com/some/path`
+    ///
+    /// ```edition2018
+    /// # use extrablatt::ArticleStream;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let mut stream = ArticleStream::new("https:://example.com/some/path").await?;
+    ///     while let Some(article) = stream.next().await {
+    ///         // ...
+    ///     }
+    /// #   Ok(())
+    /// # }
+    /// ```
+    pub async fn new<T: IntoUrl>(url: T) -> Result<ArticleStream<DefaultExtractor>> {
+        Ok(ArticleStream::new_with_extractor(url, DefaultExtractor).await?)
+    }
+
+    /// Fetch all article urls from the page the url points to and
+    /// return a new stream of articles using a designated
+    /// [`extrablatt::Extractor`].
+    pub async fn new_with_extractor<T: IntoUrl>(
+        url: T,
+        extractor: TExtractor,
+    ) -> Result<ArticleStream<TExtractor>> {
+        let paper = NewspaperBuilder::new(url)?
+            .build_with_extractor(extractor)
+            .await?;
+
+        let article_responses = paper
+            .extractor()
+            .article_urls(&paper.main_page, Some(&paper.base_url))
+            .into_iter()
+            .map(|article_url| paper.get_response(article_url.url))
+            .collect();
+
+        Ok(ArticleStream {
+            paper,
+            article_responses,
+            articles: Default::default(),
+            categories: Default::default(),
+            category_responses: Default::default(),
+        })
+    }
+
     /// Queue in new requests for articles.
     fn queue_category_articles(&mut self, doc: &Document) {
         for article_url in self
@@ -579,6 +630,7 @@ pub struct NewspaperBuilder {
     base_url: Option<Url>,
     config: Option<Config>,
     language: Option<Language>,
+    headers: Option<HeaderMap>,
 }
 
 impl NewspaperBuilder {
@@ -587,6 +639,7 @@ impl NewspaperBuilder {
             base_url: Some(base_url.into_url()?),
             config: None,
             language: None,
+            headers: None,
         })
     }
 
@@ -597,6 +650,11 @@ impl NewspaperBuilder {
 
     pub fn config(mut self, config: Config) -> Self {
         self.config = Some(config);
+        self
+    }
+
+    pub fn headers(mut self, headers: HeaderMap) -> Self {
+        self.headers = Some(headers);
         self
     }
 
@@ -615,15 +673,17 @@ impl NewspaperBuilder {
 
         let config = self.config.unwrap_or_default();
 
-        let mut headers = HeaderMap::with_capacity(1);
+        let mut headers = self.headers.unwrap_or_else(|| HeaderMap::with_capacity(1));
 
-        headers.insert(
-            USER_AGENT,
-            config.browser_user_agent.parse().context(format!(
-                "Failed to parse user agent header name: {}",
-                config.browser_user_agent
-            ))?,
-        );
+        if !headers.contains_key(USER_AGENT) {
+            headers.insert(
+                USER_AGENT,
+                config.browser_user_agent.parse().context(format!(
+                    "Failed to parse user agent header name: {}",
+                    config.browser_user_agent
+                ))?,
+            );
+        }
 
         let client = Client::builder()
             .default_headers(headers)
@@ -663,8 +723,6 @@ impl NewspaperBuilder {
         self.build_with_extractor(Default::default()).await
     }
 }
-
-// TODO refactor Error State with `ExtrablattError`
 
 #[derive(Debug)]
 pub enum DocumentDownloadState {
@@ -748,7 +806,7 @@ impl DocumentDownloadState {
     }
 
     /// If the error is due to an non 2xx response, try to read it into an
-    /// `[select::Document]` anyway.
+    /// [`select::Document`] anyway.
     async fn advance_non_http_success(
         err: ExtrablattError,
     ) -> std::result::Result<(Document, Instant), ExtrablattError> {
@@ -840,8 +898,26 @@ impl Category {
                 }
             }
         }
-
         None
+    }
+
+    /// Fetch all article urls from the page this category's url points to and
+    /// return a new stream of articles using the
+    /// [`extrablatt::DefaultExtractor`].
+    pub async fn into_stream(
+        self,
+    ) -> Result<impl Stream<Item = std::result::Result<Article, ExtrablattError>>> {
+        Ok(self.into_stream_with_extractor(DefaultExtractor).await?)
+    }
+
+    /// Fetch all article urls from the page this category's url points to and
+    /// return a new stream of article using a designated
+    /// [`extrablatt::Extractor`].
+    pub async fn into_stream_with_extractor<TExtractor: Extractor + Unpin>(
+        self,
+        extractor: TExtractor,
+    ) -> Result<impl Stream<Item = std::result::Result<Article, ExtrablattError>>> {
+        Ok(ArticleStream::new_with_extractor(self.url, extractor).await?)
     }
 }
 
