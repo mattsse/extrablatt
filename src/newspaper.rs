@@ -214,40 +214,60 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
         }
     }
 
+    pub fn has_doc(&mut self) -> Option<(Document, Instant)> {
+        unimplemented!()
+    }
+
+    /// Add a category to the pool and downloads it's content.
     ///
+    /// If the category is already available it's content is only requested if
+    /// it hasn't been requested or a previous request failed.
     pub async fn download_category(
         &mut self,
         category: Category,
-    ) -> std::result::Result<Category, (Category, ExtrablattError)> {
-        if let Some(state) = self.categories.get(&category) {
-            if state.is_success() {
-                return Ok(category);
-            }
+    ) -> std::result::Result<&Document, ExtrablattError> {
+        if self
+            .categories
+            .get(&category)
+            .and_then(|s| s.success_document())
+            .is_some()
+        {
+            return Ok(self.categories[&category].success_document().unwrap());
         }
-        let (state, err) = match self.get_document(category.url.clone()).await {
+
+        let result = match self.get_document(category.url.clone()).await {
             Ok((doc, received)) => {
                 self.insert_article_urls(&doc);
-                (DocumentDownloadState::Success { doc, received }, None)
+                Ok((doc, received))
             }
             Err((state, err)) => {
                 if !self.config.http_success_only {
                     match DocumentDownloadState::advance_non_http_success(err).await {
                         Ok((doc, received)) => {
                             self.insert_article_urls(&doc);
-                            (DocumentDownloadState::Success { doc, received }, None)
+                            Ok((doc, received))
                         }
-                        Err(err) => (state, Some(err)),
+                        Err(err) => Err((state, err)),
                     }
                 } else {
-                    (state, Some(err))
+                    Err((state, err))
                 }
             }
         };
-        self.categories.insert(category.clone(), state);
-        if let Some(err) = err {
-            Err((category, err))
-        } else {
-            Ok(category)
+        match result {
+            Ok((doc, received)) => {
+                self.categories.remove(&category);
+                Ok(self
+                    .categories
+                    .entry(category)
+                    .or_insert(DocumentDownloadState::Success { doc, received })
+                    .success_document()
+                    .unwrap())
+            }
+            Err((state, err)) => {
+                self.categories.insert(category, state);
+                Err(err)
+            }
         }
     }
 
