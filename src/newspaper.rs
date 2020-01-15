@@ -1,5 +1,5 @@
 use std::borrow::{Borrow, Cow};
-use std::collections::hash_map::IntoIter;
+use std::collections::hash_map::{Entry, IntoIter};
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -59,13 +59,6 @@ impl Newspaper<DefaultExtractor> {
 }
 
 impl<TExtractor: Extractor> Newspaper<TExtractor> {
-    /// Clear all cached articles and categories.
-    #[inline]
-    pub fn clear(&mut self) {
-        self.articles.clear();
-        self.categories.clear()
-    }
-
     #[inline]
     pub fn language(&self) -> &Language {
         &self.language
@@ -88,10 +81,23 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
         &self.extractor
     }
 
-    /// Iterator over all available categories.
+    /// All available categories.
     #[inline]
-    pub fn categories(&self) -> impl Iterator<Item = &Category> {
-        self.categories.keys()
+    pub fn categories(&self) -> &FnvHashMap<Category, DocumentDownloadState> {
+        &self.categories
+    }
+
+    /// All available articles.
+    #[inline]
+    pub fn articles(&self) -> &FnvHashMap<ArticleUrl, DocumentDownloadState> {
+        &self.articles
+    }
+
+    /// Clear all cached articles and categories.
+    #[inline]
+    pub fn clear(&mut self) {
+        self.articles.clear();
+        self.categories.clear()
     }
 
     /// Insert all categories extracted from the main page.
@@ -331,7 +337,8 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
         results
     }
 
-    /// Refresh the main page for the newspaper and returns the old document.
+    /// Refresh the main page, insert new categories and return the old
+    /// document.
     pub async fn refresh_homepage(&mut self) -> std::result::Result<Document, ExtrablattError> {
         let (main_page, _) = self
             .get_document(self.base_url.clone())
@@ -651,6 +658,9 @@ pub struct NewspaperBuilder {
     config: Option<Config>,
     language: Option<Language>,
     headers: Option<HeaderMap>,
+    /// Whether to extract and store the categories of the news paper's main
+    /// page.
+    categories: bool,
 }
 
 impl NewspaperBuilder {
@@ -660,6 +670,7 @@ impl NewspaperBuilder {
             config: None,
             language: None,
             headers: None,
+            categories: true,
         })
     }
 
@@ -675,6 +686,11 @@ impl NewspaperBuilder {
 
     pub fn headers(mut self, headers: HeaderMap) -> Self {
         self.headers = Some(headers);
+        self
+    }
+
+    pub fn categories(mut self, categories: bool) -> Self {
+        self.categories = categories;
         self
     }
 
@@ -730,7 +746,9 @@ impl NewspaperBuilder {
             config,
         };
 
-        paper.insert_new_categories();
+        if self.categories {
+            paper.insert_new_categories();
+        }
 
         Ok(paper)
     }
@@ -900,6 +918,18 @@ impl Category {
         Self { url }
     }
 
+    /// Tries to identify the language by checking the url against known
+    /// languages.
+    ///
+    /// # Example
+    ///
+    /// ```edition2018
+    /// # use extrablatt::{Category, Language};
+    /// # fn main() {
+    ///      let category = Category::new("https://cnn.com/German/".parse().unwrap());
+    ///      assert_eq!(category.language_hint(), Some(Language::German));
+    /// }
+    /// ```
     pub fn language_hint(&self) -> Option<Language> {
         for lang in Language::known_languages() {
             let full_name = lang.full_name().to_lowercase();
