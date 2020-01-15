@@ -13,7 +13,6 @@ pub mod image;
 pub mod language;
 pub mod newspaper;
 pub mod stopwords;
-pub mod storage;
 pub mod summarize;
 pub mod text;
 pub mod video;

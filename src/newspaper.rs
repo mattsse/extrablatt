@@ -24,7 +24,6 @@ use crate::article::{Article, ArticleContent, ArticleUrl};
 use crate::error::ExtrablattError;
 use crate::extract::{DefaultExtractor, Extractor};
 use crate::language::Language;
-use crate::storage::ArticleStore;
 
 #[derive(Debug)]
 pub struct Newspaper<TExtractor: Extractor = DefaultExtractor> {
@@ -993,8 +992,6 @@ pub struct Config {
     max_authors: Option<usize>,
     /// Max. number of urls to cache for a news source.
     max_doc_cache: usize,
-    /// Save articles.
-    article_storage: Option<ArticleStore>,
     /// Whether to also capture non 2XX responses.
     http_success_only: bool,
     /// The user-agent used for requests.
@@ -1042,8 +1039,6 @@ pub struct ConfigBuilder {
     max_authors: Option<usize>,
     /// Max. number of urls to cache for each news source.
     max_doc_cache: Option<usize>,
-    /// Storage for articles.
-    article_storage: Option<ArticleStore>,
     /// Whether to also capture non 2XX responses.
     http_success_only: Option<bool>,
     /// The user-agent used for requests.
@@ -1087,11 +1082,6 @@ impl ConfigBuilder {
         self
     }
 
-    pub fn article_storage(mut self, article_storage: ArticleStore) -> Self {
-        self.article_storage = Some(article_storage);
-        self
-    }
-
     pub fn http_success_only(mut self, keep_article_html: bool) -> Self {
         self.http_success_only = Some(keep_article_html);
         self
@@ -1116,7 +1106,6 @@ impl ConfigBuilder {
             max_keywords: self.max_keywords,
             max_authors: self.max_authors,
             max_doc_cache: self.max_doc_cache.unwrap_or(2_0000),
-            article_storage: self.article_storage,
             http_success_only: self.http_success_only.unwrap_or(true),
             browser_user_agent: self.browser_user_agent.unwrap_or_else(Config::user_agent),
             request_timeout: self
@@ -1138,7 +1127,6 @@ impl ConfigBuilder {
             max_keywords: None,
             max_authors: None,
             max_doc_cache: Some(2_0000),
-            article_storage: None,
             http_success_only: None,
             browser_user_agent: None,
             request_timeout: None,
