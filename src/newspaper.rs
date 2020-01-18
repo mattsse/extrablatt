@@ -20,10 +20,12 @@ use wasm_timer::Instant;
 
 use anyhow::{anyhow, Context, Result};
 
-use crate::article::{Article, ArticleContent, ArticleUrl};
+use crate::article::{Article, ArticleContent, ArticleUrl, PureArticle};
 use crate::error::ExtrablattError;
 use crate::extract::{DefaultExtractor, Extractor};
 use crate::language::Language;
+use crate::text::TextExtractor;
+use regex::internal::Input;
 
 #[derive(Debug)]
 pub struct Newspaper<TExtractor: Extractor = DefaultExtractor> {
@@ -978,24 +980,34 @@ impl Borrow<str> for Category {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
-    /// Number of word tokens in the text.
+    /// Minimum number of word tokens in the text.
     min_word_count: Option<usize>,
+    /// Maximum number of word tokens in the text.
+    max_word_count: Option<usize>,
     /// Number of sentence tokens.
     min_sentence_count: Option<usize>,
-    /// Number of chars for the text's title.
+    /// Min number of chars for the text's title.
+    min_title_len: Option<usize>,
+    /// Max number of chars for the text's title.
     max_title_len: Option<usize>,
-    /// Number of chars for the text.
+    /// Min number of chars for the text.
+    min_text_len: Option<usize>,
+    /// Max number of chars for the text.
     max_text_len: Option<usize>,
-    /// Number of keywords for the text.
+    /// Min number of keywords for the text.
+    min_keywords: Option<usize>,
+    /// Max number of keywords for the text.
     max_keywords: Option<usize>,
-    /// Number of Authors.
+    /// Min number of Authors.
+    min_authors: Option<usize>,
+    /// Max number of Authors.
     max_authors: Option<usize>,
     /// Max. number of urls to cache for a news source.
     max_doc_cache: usize,
     /// Whether to also capture non 2XX responses.
     http_success_only: bool,
     /// The user-agent used for requests.
-    browser_user_agent: String,
+    user_agent: String,
     /// Timeout for requests.
     request_timeout: Duration,
 }
@@ -1015,6 +1027,87 @@ impl Config {
     pub fn builder() -> ConfigBuilder {
         ConfigBuilder::default()
     }
+
+    /// Checks that the article fulfills the configured restrictions.
+    pub fn is_complete<'a>(&self, article: &ArticleContent<'a>) -> bool {
+        macro_rules! range_check {
+            ($($el:expr => ($min:expr ; $max:expr)),*) => {
+                $(
+                 if let Some(min) = $min {
+                    if let Some(txt) = &$el {
+                        if min > txt.len() {
+                            return false
+                        }
+                    } else {
+                        return false
+                    }
+                 }
+
+                if let Some(max) = $max {
+                    if let Some(txt) = &$el {
+                        if max < txt.len() {
+                            return false
+                        }
+                    }
+                }
+
+                )*
+            };
+        }
+
+        let mut words = None;
+        if let Some(min_word_count) = self.min_word_count {
+            if let Some(txt) = &article.text {
+                let words_ctn = TextExtractor::words(txt.as_ref()).count();
+                if min_word_count > words_ctn {
+                    return false;
+                }
+                words = Some(words_ctn);
+            } else {
+                return false;
+            }
+        }
+
+        if let Some(max_word_count) = self.max_word_count {
+            if let Some(txt) = &article.text {
+                let words_ctn = words.unwrap_or_else(|| TextExtractor::words(txt.as_ref()).count());
+                if max_word_count < words_ctn {
+                    return false;
+                }
+            }
+        }
+
+        range_check!(
+            article.text => (self.min_text_len ; self.max_text_len),
+            article.title => (self.min_title_len ; self.max_title_len)
+        );
+
+        if let Some(min_keywords) = self.min_keywords {
+            if min_keywords > article.keywords.len() {
+                return false;
+            }
+        }
+
+        if let Some(max_keywords) = self.max_keywords {
+            if max_keywords < article.keywords.len() {
+                return false;
+            }
+        }
+
+        if let Some(min_authors) = self.min_authors {
+            if min_authors > article.authors.len() {
+                return false;
+            }
+        }
+
+        if let Some(max_authors) = self.max_authors {
+            if max_authors < article.authors.len() {
+                return false;
+            }
+        }
+
+        true
+    }
 }
 
 impl Default for Config {
@@ -1025,24 +1118,34 @@ impl Default for Config {
 
 #[derive(Debug, Default)]
 pub struct ConfigBuilder {
-    /// Number of word tokens in the text.
+    /// Minimum number of word tokens in the text.
     min_word_count: Option<usize>,
+    /// Maximum number of word tokens in the text.
+    max_word_count: Option<usize>,
     /// Number of sentence tokens.
     min_sentence_count: Option<usize>,
-    /// Number of chars for the text's title.
+    /// Min number of chars for the text's title.
+    min_title_len: Option<usize>,
+    /// Max number of chars for the text's title.
     max_title_len: Option<usize>,
-    /// Number of chars for the text.
+    /// Min number of chars for the text.
+    min_text_len: Option<usize>,
+    /// Max number of chars for the text.
     max_text_len: Option<usize>,
-    /// Number of keywords for the text.
+    /// Min number of keywords for the text.
+    min_keywords: Option<usize>,
+    /// Max number of keywords for the text.
     max_keywords: Option<usize>,
-    /// Number of Authors.
+    /// Min number of Authors.
+    min_authors: Option<usize>,
+    /// Max number of Authors.
     max_authors: Option<usize>,
     /// Max. number of urls to cache for each news source.
     max_doc_cache: Option<usize>,
     /// Whether to also capture non 2XX responses.
     http_success_only: Option<bool>,
     /// The user-agent used for requests.
-    browser_user_agent: Option<String>,
+    user_agent: Option<String>,
     /// Timeout for requests.
     request_timeout: Option<Duration>,
 }
@@ -1052,8 +1155,19 @@ impl ConfigBuilder {
         self.min_word_count = Some(min_word_count);
         self
     }
+
+    pub fn max_word_count(mut self, max_word_count: usize) -> Self {
+        self.max_word_count = Some(max_word_count);
+        self
+    }
+
     pub fn min_sentence_count(mut self, min_sentence_count: usize) -> Self {
         self.min_sentence_count = Some(min_sentence_count);
+        self
+    }
+
+    pub fn min_title_len(mut self, min_title_len: usize) -> Self {
+        self.min_title_len = Some(min_title_len);
         self
     }
 
@@ -1062,13 +1176,28 @@ impl ConfigBuilder {
         self
     }
 
+    pub fn min_text_len(mut self, min_text_len: usize) -> Self {
+        self.min_text_len = Some(min_text_len);
+        self
+    }
+
     pub fn max_text_len(mut self, max_text_len: usize) -> Self {
         self.max_text_len = Some(max_text_len);
         self
     }
 
+    pub fn min_keywords(mut self, min_keywords: usize) -> Self {
+        self.min_keywords = Some(min_keywords);
+        self
+    }
+
     pub fn max_keywords(mut self, max_keywords: usize) -> Self {
         self.max_keywords = Some(max_keywords);
+        self
+    }
+
+    pub fn min_authors(mut self, min_authors: usize) -> Self {
+        self.min_authors = Some(min_authors);
         self
     }
 
@@ -1087,8 +1216,8 @@ impl ConfigBuilder {
         self
     }
 
-    pub fn browser_user_agent<T: ToString>(mut self, browser_user_agent: T) -> Self {
-        self.browser_user_agent = Some(browser_user_agent.to_string());
+    pub fn user_agent<T: ToString>(mut self, user_agent: T) -> Self {
+        self.user_agent = Some(user_agent.to_string());
         self
     }
 
@@ -1100,14 +1229,19 @@ impl ConfigBuilder {
     pub fn build(self) -> Config {
         Config {
             min_word_count: self.min_word_count,
+            max_word_count: self.max_word_count,
             min_sentence_count: self.min_sentence_count,
+            min_title_len: self.min_title_len,
             max_title_len: self.max_title_len,
+            min_text_len: self.min_text_len,
             max_text_len: self.max_text_len,
+            min_keywords: self.min_keywords,
             max_keywords: self.max_keywords,
+            min_authors: self.min_authors,
             max_authors: self.max_authors,
             max_doc_cache: self.max_doc_cache.unwrap_or(2_0000),
             http_success_only: self.http_success_only.unwrap_or(true),
-            browser_user_agent: self.browser_user_agent.unwrap_or_else(Config::user_agent),
+            user_agent: self.user_agent.unwrap_or_else(Config::user_agent),
             request_timeout: self
                 .request_timeout
                 .unwrap_or_else(|| Duration::from_secs(Config::DEFAULT_REQUEST_TIMEOUT_SEC)),
@@ -1121,14 +1255,19 @@ impl ConfigBuilder {
     pub fn with_restrictions() -> Self {
         Self {
             min_word_count: Some(300),
+            max_word_count: None,
             min_sentence_count: Some(7),
+            min_title_len: None,
             max_title_len: Some(200),
+            min_text_len: None,
             max_text_len: Some(100_000),
+            min_keywords: None,
             max_keywords: None,
+            min_authors: None,
             max_authors: None,
             max_doc_cache: Some(2_0000),
             http_success_only: None,
-            browser_user_agent: None,
+            user_agent: None,
             request_timeout: None,
         }
     }
