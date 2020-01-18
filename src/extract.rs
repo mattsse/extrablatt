@@ -17,12 +17,7 @@ use url::Host;
 use lazy_static::lazy_static;
 
 use crate::article::{
-    ArticleContent,
-    ArticleUrl,
-    ALLOWED_FILE_EXT,
-    BAD_DOMAINS,
-    BAD_SEGMENTS,
-    GOOD_SEGMENTS,
+    ArticleContent, ArticleUrl, ALLOWED_FILE_EXT, BAD_DOMAINS, BAD_SEGMENTS, GOOD_SEGMENTS,
 };
 use crate::clean::DocumentCleaner;
 use crate::date::{ArticleDate, DateExtractor, RE_DATE_SEGMENTS_M_D_Y, RE_DATE_SEGMENTS_Y_M_D};

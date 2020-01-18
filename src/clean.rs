@@ -1,8 +1,9 @@
-use lazy_static::lazy_static;
 use regex::Regex;
 use select::document::Document;
 use select::node::Node;
 use select::predicate::Name;
+
+use lazy_static::lazy_static;
 
 lazy_static! {
 

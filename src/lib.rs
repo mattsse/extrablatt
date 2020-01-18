@@ -1,5 +1,8 @@
 #![allow(unused)]
 
+/// Rexported to implement custom extractors.
+pub use select;
+
 pub use article::{Article, PureArticle};
 pub use extract::{DefaultExtractor, Extractor};
 pub use language::Language;
@@ -16,6 +19,3 @@ pub mod newspaper;
 pub mod stopwords;
 pub mod text;
 pub mod video;
-
-/// Rexported to implement custom extractors.
-pub use select;

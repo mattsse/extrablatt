@@ -12,6 +12,7 @@ use futures::future::SelectAll;
 use futures::stream::{self, BufferUnordered, FuturesUnordered, Stream};
 use futures::task::{Poll, Spawn};
 use futures::{Future, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
+use regex::internal::Input;
 use reqwest::header::{HeaderMap, USER_AGENT};
 use reqwest::{Body, Error, Response};
 use reqwest::{Client, ClientBuilder, IntoUrl, StatusCode, Url};
@@ -25,7 +26,6 @@ use crate::error::ExtrablattError;
 use crate::extract::{DefaultExtractor, Extractor};
 use crate::language::Language;
 use crate::text::TextExtractor;
-use regex::internal::Input;
 
 #[derive(Debug)]
 pub struct Newspaper<TExtractor: Extractor = DefaultExtractor> {
@@ -161,8 +161,8 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
                     }
                 })
                 .map(|url| {
-                    self.client.get(url.clone()).send().then(|res| async {
-                        (url, DocumentDownloadState::from_response(res).await)
+                    self.client.get(url.clone()).send().then(|res| {
+                        async { (url, DocumentDownloadState::from_response(res).await) }
                     })
                 }),
         )
@@ -456,15 +456,17 @@ impl<TExtractor: Extractor + Unpin> Newspaper<TExtractor> {
             .get(url.clone())
             .send()
             .map_err(|error| ExtrablattError::HttpRequestFailure { error })
-            .and_then(|response| async {
-                if !response.status().is_success() {
-                    Err(ExtrablattError::NoHttpSuccessResponse { response })
-                } else {
-                    response
-                        .bytes()
-                        .await
-                        .map(|bytes| (url, bytes))
-                        .map_err(|error| ExtrablattError::HttpRequestFailure { error })
+            .and_then(|response| {
+                async {
+                    if !response.status().is_success() {
+                        Err(ExtrablattError::NoHttpSuccessResponse { response })
+                    } else {
+                        response
+                            .bytes()
+                            .await
+                            .map(|bytes| (url, bytes))
+                            .map_err(|error| ExtrablattError::HttpRequestFailure { error })
+                    }
                 }
             })
             .boxed()
