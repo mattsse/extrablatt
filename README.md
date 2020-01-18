@@ -3,12 +3,10 @@ extrablatt
 [![Crates.io](https://img.shields.io/crates/v/extrablatt.svg)](https://crates.io/crates/extrablatt)
 [![Documentation](https://docs.rs/extrablatt/badge.svg)](https://docs.rs/extrablatt)
 
-Still WIP.
-
 Article scraping & curation.
 Inspired by [newspaper](https://github.com/codelucas/newspaper).
 
-Scraping is done using [select.rs]("https://github.com/utkarshkukreti/select.rs").
+Html Scraping via [select.rs]("https://github.com/utkarshkukreti/select.rs").
 
 ## Features
 
@@ -19,16 +17,19 @@ Scraping is done using [select.rs]("https://github.com/utkarshkukreti/select.rs"
 * Keyword extraction
 * Author extraction
 
-Adaptable for specific Newspapers via the `Extractor` trait.
+Customizable for specific news sites via the `Extractor` trait.
 
+## Documentation
+
+Full Documentation [https://docs.rs/extrablatt](https://docs.rs/extrablatt)
 
 ## Example
 
-Extract all Articles from a site.
+Extract all Articles from a news outlet.
 
 ````rust
-use extrablatt::{Language, Newspaper};
-use futures::{StreamExt};
+use extrablatt::Newspaper;
+use futures::StreamExt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -49,9 +50,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ````
 
-## Documentation
+## Command Line
 
-[https://docs.rs/extrablatt](https://docs.rs/extrablatt)
+### Install
+
+```bash
+cargo install extrablatt --features="cli"
+```
+
+### Usage 
+
+```text
+USAGE:
+    extrablatt <SUBCOMMAND>
+
+SUBCOMMANDS:
+    article     Extract a set of articles
+    category    Extract all articles found on the page
+    help        Prints this message or the help of the given subcommand(s)
+    paper       Extract all articles from a news source.
+```
+
+### Extract a set of specific articles and store the result as json
+
+````bash
+extrablatt article "https://www.example.com/article1.html", "https://www.example.com/article2.html" -o "articles.json"
+````
 
 ## License
 
