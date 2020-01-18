@@ -136,8 +136,8 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
                     }
                 })
                 .map(|url| {
-                    self.client.get(url.clone()).send().then(|res| {
-                        async { (url, DocumentDownloadState::from_response(res).await) }
+                    self.client.get(url.clone()).send().then(|res| async {
+                        (url, DocumentDownloadState::from_response(res).await)
                     })
                 }),
         )
@@ -433,17 +433,15 @@ impl<TExtractor: Extractor + Unpin> Newspaper<TExtractor> {
             .get(url.clone())
             .send()
             .map_err(|error| ExtrablattError::HttpRequestFailure { error })
-            .and_then(|response| {
-                async {
-                    if !response.status().is_success() {
-                        Err(ExtrablattError::NoHttpSuccessResponse { response })
-                    } else {
-                        response
-                            .bytes()
-                            .await
-                            .map(|bytes| (url, bytes))
-                            .map_err(|error| ExtrablattError::HttpRequestFailure { error })
-                    }
+            .and_then(|response| async {
+                if !response.status().is_success() {
+                    Err(ExtrablattError::NoHttpSuccessResponse { response })
+                } else {
+                    response
+                        .bytes()
+                        .await
+                        .map(|bytes| (url, bytes))
+                        .map_err(|error| ExtrablattError::HttpRequestFailure { error })
                 }
             })
             .boxed()
