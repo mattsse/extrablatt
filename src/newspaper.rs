@@ -470,7 +470,7 @@ pub struct ArticleStream<TExtractor: Extractor> {
     categories: Vec<(Category, Document)>,
 }
 
-impl<TExtractor: Extractor + Unpin> ArticleStream<TExtractor> {
+impl ArticleStream<DefaultExtractor> {
     /// Fetch all article urls from the page the url points to and
     /// return a new stream of articles using the
     /// [`extrablatt::DefaultExtractor`].
@@ -494,7 +494,9 @@ impl<TExtractor: Extractor + Unpin> ArticleStream<TExtractor> {
     pub async fn new<T: IntoUrl>(url: T) -> Result<ArticleStream<DefaultExtractor>> {
         Ok(ArticleStream::new_with_extractor(url, DefaultExtractor).await?)
     }
+}
 
+impl<TExtractor: Extractor + Unpin> ArticleStream<TExtractor> {
     /// Fetch all article urls from the page the url points to and
     /// return a new stream of articles using a designated
     /// [`extrablatt::Extractor`].
@@ -927,11 +929,9 @@ impl Category {
     /// # Example
     ///
     /// ```edition2018
-    /// # use extrablatt::{Category, Language};
-    /// # fn main() {
-    ///      let category = Category::new("https://cnn.com/German/".parse().unwrap());
-    ///      assert_eq!(category.language_hint(), Some(Language::German));
-    /// }
+    ///  use extrablatt::{Category, Language};
+    ///  let category = Category::new("https://cnn.com/German/".parse().unwrap());
+    ///  assert_eq!(category.language_hint(), Some(Language::German));
     /// ```
     pub fn language_hint(&self) -> Option<Language> {
         for lang in Language::known_languages() {
