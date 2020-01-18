@@ -2,7 +2,7 @@ use bytes::Bytes;
 use thiserror::Error;
 use url::Url;
 
-use crate::article::{Article, ArticleContent};
+use crate::article::{Article, ArticleContent, PureArticle};
 
 /// All different error types this crate uses.
 #[derive(Error, Debug)]
@@ -27,11 +27,9 @@ pub enum ExtrablattError {
     },
     /// Identified an article, but it's content doesn't fulfill the configured
     /// requirements.
-    #[error("Found incomplete Article for {}", url)]
+    #[error("Found incomplete Article for {}", article.url)]
     IncompleteArticle {
         /// The found article and its content.
-        article: Box<ArticleContent<'static>>,
-        /// The url of the article.
-        url: Url,
+        article: Box<PureArticle>,
     },
 }

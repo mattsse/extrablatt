@@ -66,6 +66,7 @@ pub const BAD_SEGMENTS: [&str; 17] = [
 /// Domain names that are treated as bad sources for articles.
 pub const BAD_DOMAINS: [&str; 4] = ["amazon", "doubleclick", "twitter", "outbrain"];
 
+/// An identified url to an article and it's title.
 #[derive(Debug, Clone)]
 pub struct ArticleUrl {
     /// The url of the article.
@@ -131,6 +132,19 @@ impl Borrow<Url> for ArticleUrl {
 }
 
 /// A full representation of a news article.
+///
+/// # Example
+///
+/// Download a single article directly
+///
+/// ```edition2018
+/// # use extrablatt::Article;
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let article = Article::builder("https:://example.com/some/article.html")?.get()?;
+/// #   Ok(())
+/// # }
+/// ```
 #[derive(Debug)]
 pub struct Article {
     /// The url of the article.
@@ -150,6 +164,28 @@ impl Article {
     pub fn builder<T: IntoUrl>(url: T) -> Result<ArticleBuilder> {
         ArticleBuilder::new(url)
     }
+
+    /// Drops the article's html [`select::Document`].
+    pub fn drop_document(self) -> PureArticle {
+        PureArticle {
+            url: self.url,
+            content: self.content,
+            language: self.language,
+        }
+    }
+}
+
+/// An [`extrablatt::Article`] without the [`select::Document`], mainly to use
+/// serde.
+#[derive(Debug)]
+#[cfg_attr(feature = "serde0", derive(Serialize, Deserialize))]
+pub struct PureArticle {
+    /// The url of the article.
+    pub url: Url,
+    /// The extracted content of the article.
+    pub content: ArticleContent<'static>,
+    /// The expected language of the article.
+    pub language: Language,
 }
 
 pub struct ArticleBuilder {
@@ -186,10 +222,14 @@ impl ArticleBuilder {
         self
     }
 
+    /// Downloads the article and extract it's content using the
+    /// [`extrablatt::DefaultExtractor`].
     pub async fn get(self) -> Result<Article> {
         self.get_with_extractor(&DefaultExtractor::default()).await
     }
 
+    /// Downloads the article and extracts it's content using the provided
+    /// [`extrablatt::Extractor`].
     pub async fn get_with_extractor<TExtract: Extractor>(
         self,
         extractor: &TExtract,
@@ -246,10 +286,11 @@ impl ArticleBuilder {
     }
 }
 
+/// Bundles all the content found for an article.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde0", derive(Serialize, Deserialize))]
 pub struct ArticleContent<'a> {
-    pub authors: Option<Vec<Cow<'a, str>>>,
+    pub authors: Vec<Cow<'a, str>>,
     pub title: Option<Cow<'a, str>>,
     pub publishing_date: Option<ArticleDate>,
     pub keywords: Vec<Cow<'a, str>>,
@@ -268,11 +309,15 @@ impl<'a> ArticleContent<'a> {
         ArticleContentBuilder::default()
     }
 
+    /// Transfers ownership of the content directly to this `ArticleContent`.
     pub fn into_owned(self) -> ArticleContent<'static> {
         ArticleContent {
             authors: self
                 .authors
-                .map(|x| x.into_iter().map(Cow::into_owned).map(Cow::Owned).collect()),
+                .into_iter()
+                .map(Cow::into_owned)
+                .map(Cow::Owned)
+                .collect(),
             title: self.title.map(Cow::into_owned).map(Cow::Owned),
             publishing_date: self.publishing_date,
             keywords: self
@@ -365,7 +410,7 @@ impl<'a> ArticleContentBuilder<'a> {
 
     pub fn build(self) -> ArticleContent<'a> {
         ArticleContent {
-            authors: self.authors,
+            authors: self.authors.unwrap_or_default(),
             title: self.title,
             publishing_date: self.publishing_date,
             keywords: self.keywords.unwrap_or_default(),
