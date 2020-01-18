@@ -142,7 +142,7 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let mut newspaper = Newspaper::builder("https://cnn.com/")?.build().await?;
-    ///     newspaper.download_outstanding_categories().await?;
+    ///     newspaper.download_all_outstanding_categories().await?;
     ///     for(url, content) in newspaper.download_articles().await.successes() {
     ///         // ...
     ///     }
@@ -209,20 +209,12 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
         }
     }
 
-    pub async fn retry_download_categories(&mut self) {
-        unimplemented!()
-    }
-
     fn insert_article_urls(&mut self, doc: &Document) {
         for url in self.extractor.article_urls(doc, Some(&self.base_url)) {
             self.articles
                 .entry(url)
                 .or_insert(DocumentDownloadState::NotRequested);
         }
-    }
-
-    pub fn has_doc(&mut self) -> Option<(Document, Instant)> {
-        unimplemented!()
     }
 
     /// Add a category to the pool and downloads it's content.
@@ -278,32 +270,19 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
         }
     }
 
-    /// Download and store all categories that haven't been requested yet.
-    pub async fn download_all_outstanding_categories(
+    async fn download_categories(
         &mut self,
+        items: Vec<Category>,
     ) -> Vec<std::result::Result<Category, (Category, ExtrablattError)>> {
-        // join all futures
-        let requests = stream::iter(
-            self.categories
-                .iter()
-                .filter_map(|(cat, state)| {
-                    if state.is_not_requested() {
-                        Some(cat)
-                    } else {
-                        None
-                    }
-                })
-                .map(|cat| {
-                    let cat = cat.clone();
-                    self.client.get(cat.url.clone()).send().then(|res| async {
-                        (cat, DocumentDownloadState::from_response(res).await)
-                    })
-                }),
-        )
+        let requests = stream::iter(items.into_iter().map(|cat| {
+            self.client
+                .get(cat.url.clone())
+                .send()
+                .then(|res| async { (cat, DocumentDownloadState::from_response(res).await) })
+        }))
         .buffer_unordered(10)
         .collect::<Vec<_>>()
         .await;
-
         let mut results = Vec::with_capacity(requests.len());
 
         for (cat, res) in requests {
@@ -336,6 +315,44 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
             results.push(res);
         }
         results
+    }
+
+    /// Retry downloading all missing category documents, including failed
+    /// previous attempts.
+    pub async fn retry_download_categories(
+        &mut self,
+    ) -> Vec<std::result::Result<Category, (Category, ExtrablattError)>> {
+        let items: Vec<_> = self
+            .categories
+            .iter()
+            .filter_map(|(cat, state)| {
+                if !state.is_success() {
+                    Some(cat.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        self.download_categories(items).await
+    }
+
+    /// Download and store all categories and their identified articles that
+    /// haven't been requested yet.
+    pub async fn download_all_outstanding_categories(
+        &mut self,
+    ) -> Vec<std::result::Result<Category, (Category, ExtrablattError)>> {
+        let items: Vec<_> = self
+            .categories
+            .iter()
+            .filter_map(|(cat, state)| {
+                if state.is_not_requested() {
+                    Some(cat.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        self.download_categories(items).await
     }
 
     /// Refresh the main page, insert new categories and return the old
@@ -624,13 +641,22 @@ impl<TExtractor: Extractor + Unpin> Stream for ArticleStream<TExtractor> {
                                 .meta_language(&doc)
                                 .unwrap_or_else(|| self.paper.language.clone());
 
-                            // TODO check completeness
-                            Ok(Article {
-                                url,
-                                doc,
-                                content,
-                                language,
-                            })
+                            if self.paper.config.is_complete(&content) {
+                                Ok(Article {
+                                    url,
+                                    doc,
+                                    content,
+                                    language,
+                                })
+                            } else {
+                                Err(ExtrablattError::IncompleteArticle {
+                                    article: Box::new(PureArticle {
+                                        url,
+                                        content,
+                                        language,
+                                    }),
+                                })
+                            }
                         } else {
                             Err(ExtrablattError::ReadDocumentError { body })
                         }
@@ -715,9 +741,9 @@ impl NewspaperBuilder {
         if !headers.contains_key(USER_AGENT) {
             headers.insert(
                 USER_AGENT,
-                config.browser_user_agent.parse().context(format!(
+                config.user_agent.parse().context(format!(
                     "Failed to parse user agent header name: {}",
-                    config.browser_user_agent
+                    config.user_agent
                 ))?,
             );
         }
@@ -859,6 +885,7 @@ impl DocumentDownloadState {
         }
     }
 
+    /// The actual document if the request was successful.
     pub fn success_document(&self) -> Option<&Document> {
         match self {
             DocumentDownloadState::Success { doc, .. } => Some(doc),
