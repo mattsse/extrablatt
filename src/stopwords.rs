@@ -94,26 +94,6 @@ impl Deref for StopWords {
     }
 }
 
-impl StopWords {
-    /// Read the `Stopwords` for the `language` from the corresponding file.
-    pub fn read_language_stopwords(language: Language) -> Result<Self> {
-        let file_name = format!("stopwords-{}.txt", language.identifier());
-
-        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("resources/stopwords")
-            .join(file_name);
-
-        let mut f = fs::File::open(path)?;
-        let file = BufReader::new(&f);
-        let words: Result<HashSet<_>, _> = file.lines().collect();
-
-        Ok(Self {
-            language,
-            words: words?,
-        })
-    }
-}
-
 /// Stopwords for Dutch Language
 pub static DUTCH_STOPWORDS: [&str; 48] = [
     "aan", "af", "al", "als", "bij", "dan", "dat", "die", "dit", "een", "en", "er", "had", "heb",
