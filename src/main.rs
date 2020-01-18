@@ -19,7 +19,7 @@ enum App {
         #[structopt(flatten)]
         opts: Opts,
     },
-    #[structopt(name = "article", about = "Extract single articles")]
+    #[structopt(name = "article", about = "Extract a set of articles")]
     Article {
         #[structopt(name = "urls", help = "The urls of the articles to download.")]
         urls: Vec<Url>,
@@ -31,7 +31,7 @@ enum App {
         )]
         output: Option<PathBuf>,
     },
-    #[structopt(name = "category", about = "Extract all article found on the page")]
+    #[structopt(name = "category", about = "Extract all articles found on the page")]
     Category {
         #[structopt(
             name = "url",
@@ -114,7 +114,7 @@ impl App {
 
 #[derive(Debug, Clone, StructOpt)]
 pub struct Opts {
-    #[structopt(name = "max-title", help = "Number of word tokens in the text.")]
+    #[structopt(name = "min-word", help = "Number of word tokens in the text.")]
     min_word_count: Option<usize>,
     #[structopt(name = "max-title", help = "Max number of chars for the text's title.")]
     max_title_len: Option<usize>,
