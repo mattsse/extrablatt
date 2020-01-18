@@ -6,7 +6,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-use log::{debug, info};
+use log::info;
 use regex::Regex;
 use reqwest::Url;
 use select::document::Document;
@@ -24,6 +24,7 @@ use crate::article::{
     BAD_SEGMENTS,
     GOOD_SEGMENTS,
 };
+use crate::clean::DocumentCleaner;
 use crate::date::{ArticleDate, DateExtractor, RE_DATE_SEGMENTS_M_D_Y, RE_DATE_SEGMENTS_Y_M_D};
 use crate::error::ExtrablattError;
 use crate::newspaper::Category;
@@ -236,7 +237,7 @@ pub trait Extractor {
 
     /// Finds all `<meta>` nodes in the document.
     fn meta_data<'a>(&self, doc: &'a Document) -> Vec<MetaNode<'a>> {
-        doc.find(Name("meta"))
+        doc.find(Name("head").descendant(Name("meta")))
             .map(|node| MetaNode { inner: node })
             .filter(MetaNode::is_key_value)
             .collect()
@@ -248,7 +249,7 @@ pub trait Extractor {
         doc: &'a Document,
         attr: Attr<&'b str, &'b str>,
     ) -> Option<Cow<'a, str>> {
-        doc.find(Name("meta").and(attr))
+        doc.find(Name("head").descendant(Name("meta").and(attr)))
             .filter_map(|node| node.attr("content").map(str::trim).map(Cow::Borrowed))
             .next()
     }
@@ -319,13 +320,13 @@ pub trait Extractor {
     /// Get the full text of the article.
     fn text<'a>(&self, doc: &'a Document, lang: Language) -> Option<Cow<'a, str>> {
         if let Some(node) = self.text_node(doc, lang) {
-            node.as_text().map(Cow::Borrowed)
+            Some(Cow::Owned(DocumentCleaner::clean_text_node(&*node)))
         } else {
             None
         }
     }
 
-    /// The [`select::Node`] that contains the article's text.
+    /// Detect the [`select::Node`] that contains the article's text.
     fn text_node<'a>(&self, doc: &'a Document, lang: Language) -> Option<TextNode<'a>> {
         TextExtractor::calculate_best_node(doc, lang)
     }
@@ -388,7 +389,6 @@ pub trait Extractor {
             return false;
         }
         if !is_valid_domain(&article.url, base_url) {
-            debug!("No valid article domain {:?}", article.url.domain());
             return false;
         }
         let mut path_segments = Vec::new();
@@ -396,7 +396,6 @@ pub trait Extractor {
             for segment in segments {
                 let segment = segment.to_lowercase().to_lowercase();
                 if BAD_SEGMENTS.contains(&segment.as_str()) {
-                    debug!("Bad segment in article path {:?}", article.url.domain());
                     return false;
                 }
                 if !segment.is_empty() {
@@ -424,17 +423,12 @@ pub trait Extractor {
                     // prevents false negatives for articles with a trailing id like `1.343234`
                     path_segments.push(last_segment);
                 } else {
-                    debug!(
-                        "Encountered blacklisted filetype {} on article {:?}",
-                        last_segment, article.url
-                    );
                     return false;
                 }
             } else {
                 path_segments.push(last_segment);
             }
         } else {
-            debug!("Article url has no path segments: {:?}", article.url);
             return false;
         }
 
@@ -484,10 +478,6 @@ pub trait Extractor {
 
     fn is_category(category: &Category, base_url: &Url) -> bool {
         if category.url.path().starts_with("/#") {
-            debug!(
-                "Ignoring category url starting with '#': {:?}",
-                category.url
-            );
             return false;
         }
 
@@ -503,12 +493,6 @@ pub trait Extractor {
         }
 
         if category.url.scheme() != base_url.scheme() {
-            debug!(
-                "Ignoring category url {:?} with unexpected scheme. Expected: {}, got: {} ",
-                category.url,
-                category.url.scheme(),
-                base_url.scheme()
-            );
             return false;
         }
 
