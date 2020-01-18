@@ -1,5 +1,4 @@
 use std::ops::Deref;
-use std::str::FromStr;
 
 use select::node::Node;
 use select::predicate::{Attr, Name, Predicate};

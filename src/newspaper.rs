@@ -1,21 +1,16 @@
-use std::borrow::{Borrow, Cow};
-use std::collections::hash_map::{Entry, IntoIter};
+use std::borrow::Borrow;
 use std::ops::{Deref, DerefMut};
-use std::path::PathBuf;
 use std::pin::Pin;
-use std::process::Output;
 use std::time::Duration;
 
 use bytes::Bytes;
-use fnv::{FnvHashMap, FnvHashSet};
-use futures::future::SelectAll;
-use futures::stream::{self, BufferUnordered, FuturesUnordered, Stream};
-use futures::task::{Poll, Spawn};
-use futures::{Future, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
-use regex::internal::Input;
+use fnv::FnvHashMap;
+use futures::stream::{self, Stream};
+use futures::task::Poll;
+use futures::{Future, FutureExt, StreamExt, TryFutureExt};
 use reqwest::header::{HeaderMap, USER_AGENT};
-use reqwest::{Body, Error, Response};
-use reqwest::{Client, ClientBuilder, IntoUrl, StatusCode, Url};
+use reqwest::Response;
+use reqwest::{Client, IntoUrl, Url};
 use select::document::Document;
 use wasm_timer::Instant;
 
@@ -110,26 +105,6 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
         }
     }
 
-    /// For each successfully downloaded category document, insert their article
-    /// urls as unrequested.
-    fn insert_new_outstanding_articles(&mut self) {
-        for category_doc in self.categories.values().filter_map(|doc| match doc {
-            DocumentDownloadState::Success { doc, .. } => Some(doc),
-            _ => None,
-        }) {
-            for article in self
-                .extractor
-                .article_urls(&category_doc, Some(&self.base_url))
-                .into_iter()
-                .take(self.config.max_doc_cache - self.articles.len())
-            {
-                self.articles
-                    .entry(article)
-                    .or_insert(DocumentDownloadState::NotRequested);
-            }
-        }
-    }
-
     /// Download and store all outstanding articles and returns an iterator over
     /// their results.
     ///
@@ -209,6 +184,8 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
         }
     }
 
+    /// For each successfully downloaded category document, insert their article
+    /// urls as unrequested.
     fn insert_article_urls(&mut self, doc: &Document) {
         for url in self.extractor.article_urls(doc, Some(&self.base_url)) {
             self.articles
@@ -602,7 +579,7 @@ impl<TExtractor: Extractor + Unpin> Stream for ArticleStream<TExtractor> {
                 Some((idx, resp)) => {
                     let _ = self.category_responses.swap_remove(idx);
                     match resp {
-                        Ok((url, body)) => {
+                        Ok((_, body)) => {
                             if let Ok(doc) = Document::from_read(&*body) {
                                 self.queue_category_articles(&doc);
                             } else {
@@ -783,10 +760,6 @@ impl NewspaperBuilder {
     }
 
     pub async fn build(self) -> Result<Newspaper> {
-        let base_url = self
-            .base_url
-            .clone()
-            .context("Url of the article must be initialized.")?;
         self.build_with_extractor(Default::default()).await
     }
 }

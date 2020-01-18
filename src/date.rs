@@ -1,11 +1,10 @@
-use std::borrow::Cow;
 use std::collections::HashMap;
 
-use chrono::prelude::*;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+
 use regex::Regex;
 use select::document::Document;
-use select::node::Node;
+
 use select::predicate::{Attr, Name, Predicate};
 #[cfg(feature = "serde0")]
 use serde::{Deserialize, Serialize};

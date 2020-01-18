@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 /// Rexported to implement custom extractors.
 pub use select;
 

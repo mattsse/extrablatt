@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::fmt;
+
 use std::ops::Deref;
 
 use select::document::Document;
@@ -23,12 +23,6 @@ impl<'a> Deref for TextNode<'a> {
     }
 }
 
-impl<'a> fmt::Display for TextNode<'a> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        unimplemented!()
-    }
-}
-
 pub struct TextExtractor;
 
 impl TextExtractor {
@@ -38,7 +32,7 @@ impl TextExtractor {
 
     pub fn calculate_best_node(doc: &Document, lang: Language) -> Option<TextNode> {
         let mut starting_boost = 1.0;
-        let cnt = 0usize;
+        let _cnt = 0usize;
 
         let txt_nodes: Vec<_> = TextExtractor::nodes_to_check(doc)
             .filter(TextExtractor::is_high_link_density)

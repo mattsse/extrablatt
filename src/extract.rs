@@ -1,12 +1,10 @@
 use std::borrow::Cow;
-use std::collections::HashMap;
+
 use std::collections::HashSet;
 use std::ops::Deref;
-use std::path::Path;
+
 use std::str::FromStr;
 
-use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-use log::info;
 use regex::Regex;
 use reqwest::Url;
 use select::document::Document;
@@ -21,7 +19,7 @@ use crate::article::{
 };
 use crate::clean::DocumentCleaner;
 use crate::date::{ArticleDate, DateExtractor, RE_DATE_SEGMENTS_M_D_Y, RE_DATE_SEGMENTS_Y_M_D};
-use crate::error::ExtrablattError;
+
 use crate::newspaper::Category;
 use crate::stopwords::CATEGORY_STOPWORDS;
 use crate::text::{TextExtractor, TextNode};

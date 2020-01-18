@@ -1,13 +1,12 @@
 use std::borrow::{Borrow, Cow};
-use std::fmt;
+
 use std::hash::{Hash, Hasher};
-use std::ops::{Deref, DerefMut};
+
 use std::time::Duration;
 
 use anyhow::{Context, Result};
-use futures::future::FutureExt;
 use reqwest::header::{HeaderMap, USER_AGENT};
-use reqwest::{Client, IntoUrl, RequestBuilder, Url};
+use reqwest::{Client, IntoUrl, Url};
 use select::document::Document;
 #[cfg(feature = "serde0")]
 use serde::{Deserialize, Serialize};
@@ -16,7 +15,7 @@ use crate::date::ArticleDate;
 use crate::error::ExtrablattError;
 use crate::extract::{DefaultExtractor, Extractor};
 use crate::language::Language;
-use crate::newspaper::{Config, DocumentDownloadState};
+use crate::newspaper::Config;
 
 /// Extension for documents that are considered valid sources for articles.
 pub const ALLOWED_FILE_EXT: [&str; 12] = [

@@ -1,8 +1,7 @@
 use bytes::Bytes;
 use thiserror::Error;
-use url::Url;
 
-use crate::article::{Article, ArticleContent, PureArticle};
+use crate::article::PureArticle;
 
 /// All different error types this crate uses.
 #[derive(Error, Debug)]
