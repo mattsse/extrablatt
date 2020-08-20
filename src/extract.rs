@@ -298,7 +298,10 @@ pub trait Extractor {
 
     /// If the article has meta description set in the source, use that
     fn meta_description<'a>(&self, doc: &'a Document) -> Option<Cow<'a, str>> {
-        self.meta_content(doc, Attr("property", "description"))
+        [("property", "description"), ("name", "description")]
+            .iter()
+            .filter_map(|(k, v)| self.meta_content(doc, Attr(k, v)))
+            .next()
     }
 
     /// If the article has meta keywords set in the source, use that.
