@@ -157,6 +157,23 @@ pub struct Article {
 }
 
 impl Article {
+    /// Retrieves the [`ArticleContent`] from the `url`
+    ///
+    /// Convenience method for:
+    ///
+    /// ```no_run
+    ///  Article::builder(url)?.get().await?.content
+    /// ```
+    pub async fn content<T: IntoUrl>(url: T) -> Result<ArticleContent<'static>> {
+        let article = Self::get(url).await?;
+        Ok(article.content)
+    }
+
+    /// Get the [`Article`] for the `url`
+    pub async fn get<T: IntoUrl>(url: T) -> Result<Article> {
+        Self::builder(url)?.get().await
+    }
+
     /// Convenience method for creating a new [`ArticleBuilder`]
     ///
     /// Same as calling [`ArticleBuilder::new`]

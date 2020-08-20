@@ -160,17 +160,24 @@ pub trait Extractor {
         let mut authors = HashSet::new();
         for &key in &["name", "rel", "itemprop", "class", "id"] {
             for &value in &["author", "byline", "dc.creator", "byl"] {
-                authors.extend(
-                    doc.find(Attr(key, value))
-                        .filter_map(|n| n.as_text())
-                        .filter_map(|name| RE_AUTHOR_NAME.captures(name))
-                        .filter_map(|cap| cap.name("name"))
-                        .map(|m| m.as_str().trim())
-                        .flat_map(|name| name.split(" and ")),
-                );
+                for node in doc.find(Attr(key, value)) {
+                    let txt = node.text();
+                    let t = txt.trim();
+                    if t.is_empty() {
+                        continue;
+                    }
+                    if let Some(cap) = RE_AUTHOR_NAME.captures(t) {
+                        if let Some(m) = cap.name("name") {
+                            for author in m.as_str().trim().split(" and ") {
+                                authors.insert(author.to_string());
+                            }
+
+                        }
+                    }
+                }
             }
         }
-        authors.into_iter().map(Cow::Borrowed).collect()
+        authors.into_iter().map(Cow::Owned).collect()
     }
 
     /// When the article was published (and last updated).
