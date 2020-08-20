@@ -303,17 +303,24 @@ pub trait Extractor {
 
     /// If the article has meta keywords set in the source, use that.
     fn meta_keywords<'a>(&self, doc: &'a Document) -> Vec<Cow<'a, str>> {
-        self.meta_content(doc, Attr("property", "keywords"))
-            .map(|s| match s {
-                Cow::Owned(s) => s
-                    .split(',')
-                    .map(str::trim)
-                    .map(ToString::to_string)
-                    .map(Cow::Owned)
-                    .collect(),
-                Cow::Borrowed(s) => s.split(',').map(str::trim).map(Cow::Borrowed).collect(),
-            })
-            .unwrap_or_default()
+        for (k, v) in &[
+            ("property", "keywords"),
+            ("name", "news_keywords"),
+            ("name", "keywords"),
+        ] {
+            if let Some(keywords) = self.meta_content(doc, Attr(k, v)) {
+                return match keywords {
+                    Cow::Owned(s) => s
+                        .split(',')
+                        .map(str::trim)
+                        .map(ToString::to_string)
+                        .map(Cow::Owned)
+                        .collect(),
+                    Cow::Borrowed(s) => s.split(',').map(str::trim).map(Cow::Borrowed).collect(),
+                };
+            }
+        }
+        Vec::new()
     }
 
     /// Get the full text of the article.
