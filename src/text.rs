@@ -6,13 +6,98 @@ use select::document::Document;
 use select::node::Node;
 use select::predicate::{Name, Predicate};
 
+use crate::clean::{DefaultDocumentCleaner, DocumentCleaner};
+use crate::video::VideoNode;
 use crate::Language;
 
 pub const PUNCTUATION: &str = r###",."'!?&-/:;()#$%*+<=>@[\]^_`{|}~"###;
 
+pub trait TextContainer<'a> {
+    fn first_text(&self) -> Option<&'a str>;
+
+    // fn text_descendants()
+}
+
+impl<'a> TextContainer<'a> for Node<'a> {
+    fn first_text(&self) -> Option<&'a str> {
+        self.children().find_map(|n| n.as_text())
+    }
+}
+
+pub struct TextNodeFind<'a> {
+    document: &'a Document,
+    next: usize,
+}
+
+impl<'a> TextNodeFind<'a> {
+    fn is_text_node(node: &Node<'a>) -> bool {
+        Name("p").or(Name("pre").or(Name("td"))).matches(node)
+    }
+
+    fn is_bad(node: &Node<'a>) -> bool {
+        Name("figure")
+            .or(Name("media"))
+            .or(Name("aside"))
+            .matches(node)
+    }
+
+    fn new(document: &'a Document) -> Self {
+        Self { document, next: 0 }
+    }
+}
+
+impl<'a> Iterator for TextNodeFind<'a> {
+    type Item = Node<'a>;
+
+    fn next(&mut self) -> Option<Node<'a>> {
+        while self.next < self.document.nodes.len() {
+            let node = self.document.nth(self.next).unwrap();
+            self.next += 1;
+            if Self::is_bad(&node) {
+                self.next += node.descendants().count();
+            }
+            if Self::is_text_node(&node) {
+                return Some(node);
+            }
+        }
+        None
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TextNode<'a> {
     inner: Node<'a>,
+}
+
+impl<'a> TextNode<'a> {
+    /// Extract the content from the node, but ignore those that not contain
+    /// parts of the article
+    pub fn clean_text(&self) -> String {
+        DefaultDocumentCleaner::clean_node_text(&self.inner)
+    }
+
+    /// Extract all the nodes that hold video data
+    pub fn videos(&self) -> Vec<VideoNode<'a>> {
+        let mut videos: Vec<_> = self
+            .inner
+            .find(VideoNode::node_predicate())
+            .map(VideoNode::new)
+            .collect();
+
+        videos.extend(
+            self.inner
+                .find(Name("embed"))
+                .filter(|n| {
+                    if let Some(parent) = n.parent() {
+                        parent.name() != Some("object")
+                    } else {
+                        false
+                    }
+                })
+                .map(VideoNode::new),
+        );
+        videos
+    }
 }
 
 impl<'a> Deref for TextNode<'a> {
@@ -32,12 +117,11 @@ impl TextExtractor {
 
     pub fn calculate_best_node(doc: &Document, lang: Language) -> Option<TextNode> {
         let mut starting_boost = 1.0;
-        let _cnt = 0usize;
 
         let txt_nodes: Vec<_> = TextExtractor::nodes_to_check(doc)
-            .filter(TextExtractor::is_high_link_density)
+            .filter(|n| !TextExtractor::is_high_link_density(n))
             .filter_map(|node| {
-                if let Some(stats) = node.as_text().and_then(|txt| lang.stopword_count(txt)) {
+                if let Some(stats) = node.first_text().and_then(|txt| lang.stopword_count(txt)) {
                     if stats.stopword_count > 2 {
                         return Some((node, stats));
                     }
@@ -52,6 +136,7 @@ impl TextExtractor {
         let negative_scoring = 0.0;
         let bottom_negativescore_nodes = nodes_number as f64 * 0.25;
 
+        println!("\n\n");
         for (i, (node, stats)) in txt_nodes.iter().enumerate() {
             let mut boost_score = 0.0;
 
@@ -82,17 +167,27 @@ impl TextExtractor {
                 *score += upscore;
                 *cnt += 1;
 
+                // also update additional parent levels
+
                 if let Some(parent_parent) = parent.parent() {
                     let (score, cnt) = nodes_scores
                         .entry(parent_parent.index())
                         .or_insert((0usize, 0usize));
                     *cnt += 1;
                     *score += upscore / 2;
+
+                    if let Some(parent_2) = parent_parent.parent() {
+                        let (score, cnt) = nodes_scores
+                            .entry(parent_2.index())
+                            .or_insert((0usize, 0usize));
+                        *cnt += 1;
+                        *score += upscore / 3;
+                    }
                 }
             }
         }
 
-        let mut index = nodes_scores.keys().copied().next();
+        let mut index = nodes_scores.keys().cloned().next();
         let mut top_score = 0;
         for (idx, (score, _)) in nodes_scores {
             if score > top_score {
@@ -108,7 +203,7 @@ impl TextExtractor {
 
     /// Returns all nodes we want to search on like paragraphs and tables
     fn nodes_to_check(doc: &Document) -> impl Iterator<Item = Node> {
-        doc.find(Name("p").or(Name("pre").or(Name("td"))))
+        TextNodeFind::new(doc)
     }
 
     /// A lot of times the first paragraph might be the caption under an image
@@ -122,7 +217,10 @@ impl TextExtractor {
             if steps_away >= TextExtractor::MAX_STEPSAWAY_FROM_NODE {
                 return false;
             }
-            if let Some(stats) = sibling.as_text().and_then(|txt| lang.stopword_count(txt)) {
+            if let Some(stats) = sibling
+                .first_text()
+                .and_then(|txt| lang.stopword_count(txt))
+            {
                 if stats.stopword_count > TextExtractor::MINIMUM_STOPWORD_COUNT {
                     return true;
                 }
@@ -135,7 +233,7 @@ impl TextExtractor {
     /// Checks the density of links within a node, if there is a high link to
     /// text ratio, then the text is less likely to be relevant
     fn is_high_link_density(node: &Node) -> bool {
-        let links = node.find(Name("a")).filter_map(|n| n.as_text());
+        let links = node.find(Name("a")).filter_map(|n| n.first_text());
 
         if let Some(words) = node.as_text().map(|s| s.split_whitespace()) {
             let words_number = words.count();

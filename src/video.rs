@@ -32,6 +32,11 @@ pub struct VideoNode<'a> {
 }
 
 impl<'a> VideoNode<'a> {
+    /// The common predicate to identify Video node
+    pub fn node_predicate() -> impl Predicate {
+        Name("iframe").or(Name("object").or(Name("video")))
+    }
+
     pub fn new(inner: Node<'a>) -> Self {
         Self { inner }
     }

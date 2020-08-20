@@ -17,7 +17,7 @@ use lazy_static::lazy_static;
 use crate::article::{
     ArticleContent, ArticleUrl, ALLOWED_FILE_EXT, BAD_DOMAINS, BAD_SEGMENTS, GOOD_SEGMENTS,
 };
-use crate::clean::DocumentCleaner;
+use crate::clean::{DefaultDocumentCleaner, DocumentCleaner};
 use crate::date::{ArticleDate, DateExtractor, RE_DATE_SEGMENTS_M_D_Y, RE_DATE_SEGMENTS_Y_M_D};
 
 use crate::extrablatt::Category;
@@ -327,11 +327,17 @@ pub trait Extractor {
 
     /// Get the full text of the article.
     fn text<'a>(&self, doc: &'a Document, lang: Language) -> Option<Cow<'a, str>> {
-        if let Some(node) = self.text_node(doc, lang) {
-            Some(Cow::Owned(DocumentCleaner::clean_text_node(&*node)))
-        } else {
-            None
-        }
+        self.text_with_cleaner::<DefaultDocumentCleaner>(doc, lang)
+    }
+
+    /// Get the full text of the article with a designated `DocumentCleaner`
+    fn text_with_cleaner<'a, T: DocumentCleaner>(
+        &self,
+        doc: &'a Document,
+        lang: Language,
+    ) -> Option<Cow<'a, str>> {
+        self.text_node(doc, lang)
+            .map(|n| T::clean_node_text(&*n).into())
     }
 
     /// Detect the [`select::Node`] that contains the article's text.
@@ -547,17 +553,18 @@ pub trait Extractor {
             lang.unwrap_or_default()
         };
 
-        if let Some(text) = self.text(doc, lang.clone()) {
-            builder = builder.text(text);
+        if let Some(txt_node) = self.text_node(doc, lang.clone()) {
+            builder = builder
+                .videos(
+                    txt_node
+                        .videos()
+                        .into_iter()
+                        .filter_map(|x| x.get_src_url(base_url))
+                        .filter_map(|url| url.ok())
+                        .collect(),
+                )
+                .text(txt_node.text().into())
         }
-
-        builder = builder.videos(
-            self.videos(doc, Some(lang))
-                .into_iter()
-                .filter_map(|x| x.get_src_url(base_url))
-                .filter_map(|url| url.ok())
-                .collect(),
-        );
 
         if let Some(description) = self.meta_description(doc) {
             builder = builder.description(description);
@@ -601,23 +608,7 @@ pub trait Extractor {
     /// All video content in the article.
     fn videos<'a>(&self, doc: &'a Document, lang: Option<Language>) -> Vec<VideoNode<'a>> {
         if let Some(node) = self.text_node(doc, lang.unwrap_or_default()) {
-            let mut videos: Vec<_> = node
-                .find(Name("iframe").or(Name("object").or(Name("video"))))
-                .map(VideoNode::new)
-                .collect();
-
-            videos.extend(
-                node.find(Name("embed"))
-                    .filter(|n| {
-                        if let Some(parent) = n.parent() {
-                            parent.name() != Some("object")
-                        } else {
-                            false
-                        }
-                    })
-                    .map(VideoNode::new),
-            );
-            videos
+            node.videos()
         } else {
             Vec::new()
         }

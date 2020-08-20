@@ -12,30 +12,9 @@ lazy_static! {
 
 const ATTR_TO_CHECK: [&str; 3] = ["id", "class", "name"];
 
-pub struct DocumentCleaner;
-
-impl DocumentCleaner {
-    /// Extract all textual content from the node, but ignore those nodes, that
-    /// do not contain parts of the article.
-    pub fn clean_text_node(node: &Node) -> String {
-        fn recur_text(node: &Node, string: &mut String) {
-            if !DocumentCleaner::has_bad_attr(node) {
-                if let Some(text) = node.as_text() {
-                    string.push_str(text);
-                }
-            }
-            for child in node.children() {
-                recur_text(&child, string)
-            }
-        }
-
-        let mut txt = String::new();
-        recur_text(node, &mut txt);
-        txt
-    }
-
+pub trait DocumentCleaner {
     /// Ignore nodes that usually do not contain content for the article.
-    pub fn has_bad_attr(node: &Node) -> bool {
+    fn has_bad_attr(node: &Node) -> bool {
         for attr in ATTR_TO_CHECK.iter() {
             if let Some(id) = node.attr(attr) {
                 if RE_BAD_NODES.is_match(id) {
@@ -45,4 +24,29 @@ impl DocumentCleaner {
         }
         false
     }
+
+    /// Extract all textual content from the node, but ignore those nodes, that
+    /// do not contain parts of the article.
+    fn clean_node_text(node: &Node) -> String {
+        fn recur_text<T: DocumentCleaner + ?Sized>(node: &Node, string: &mut String) {
+            if !T::has_bad_attr(node) {
+                if let Some(text) = node.as_text() {
+                    string.push_str(text);
+                }
+            }
+            for child in node.children() {
+                recur_text::<T>(&child, string)
+            }
+        }
+
+        let mut txt = String::new();
+        recur_text::<Self>(node, &mut txt);
+        txt
+    }
 }
+
+/// A standard implementation of a cleaner that only extracts good textual
+/// content form the nodes descendants
+pub struct DefaultDocumentCleaner;
+
+impl DocumentCleaner for DefaultDocumentCleaner {}

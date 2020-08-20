@@ -112,7 +112,7 @@ impl<TExtractor: Extractor> Extrablatt<TExtractor> {
     ///
     /// Loop over all downloaded articles.
     ///
-    /// ```edition2018
+    /// ```rust
     /// # use extrablatt::Extrablatt;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -478,7 +478,7 @@ impl ArticleStream<DefaultExtractor> {
     /// Create a new [`extrablatt::ArticleStream`] that yields all articles
     /// referenced on `https:://example.com/some/path`
     ///
-    /// ```edition2018
+    /// ```rust
     /// # use extrablatt::ArticleStream;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -911,7 +911,7 @@ impl Category {
     ///
     /// # Example
     ///
-    /// ```edition2018
+    /// ```rust
     ///  use extrablatt::{Category, Language};
     ///  let category = Category::new("https://cnn.com/German/".parse().unwrap());
     ///  assert_eq!(category.language_hint(), Some(Language::German));
