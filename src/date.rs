@@ -46,10 +46,12 @@ lazy_static! {
 
     /// Common nodes that hold the article's publishing date.
     pub(crate) static ref  PUBLISH_DATE_NODES: Vec<NodeValueQuery<'static>> = {
-            let mut nodes = Vec::with_capacity(12);
+            let mut nodes = Vec::with_capacity(13);
             nodes.push(NodeValueQuery::new( Name("meta"), Attr("property",  "rnews:datePublished"),
              "content"));
             nodes.push(NodeValueQuery::new( Name("meta"), Attr("property",  "article:published_time"),
+             "content"));
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("property",  "article:published"),
              "content"));
             nodes.push(NodeValueQuery::new( Name("meta"), Attr("name",  "OriginalPublicationDate"),
              "content"));

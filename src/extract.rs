@@ -171,7 +171,6 @@ pub trait Extractor {
                             for author in m.as_str().trim().split(" and ") {
                                 authors.insert(author.to_string());
                             }
-
                         }
                     }
                 }
