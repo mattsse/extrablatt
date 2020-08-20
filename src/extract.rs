@@ -254,14 +254,13 @@ pub trait Extractor {
     }
 
     /// Extract the thumbnail for the article.
-    fn meta_thumbnail_url(&self, doc: &Document, base_url: &Url) -> Option<Url> {
-        let options = Url::options().base_url(Some(base_url));
-        if let Some(meta) = self.meta_content(doc, Attr("thumbnail", "thumbnailUrl")) {
-            if let Ok(url) = options.parse(&*meta) {
-                return Some(url);
-            }
-        }
-        None
+    fn meta_thumbnail_url(&self, doc: &Document, base_url: Option<&Url>) -> Option<Url> {
+        let options = Url::options().base_url(base_url);
+        [("name", "thumbnail"), ("name", "thumbnailUrl")]
+            .iter()
+            .filter_map(|(k, v)| self.meta_content(doc, Attr(k, v)))
+            .filter_map(|url| options.parse(&*url).ok())
+            .next()
     }
 
     /// Extract the 'top img' as specified by the website.
@@ -562,6 +561,9 @@ pub trait Extractor {
 
         if let Some(description) = self.meta_description(doc) {
             builder = builder.description(description);
+        }
+        if let Some(thumbnail) = self.meta_thumbnail_url(doc, base_url) {
+            builder = builder.thumbnail(thumbnail);
         }
         if let Some(title) = self.title(doc) {
             builder = builder.title(title);
