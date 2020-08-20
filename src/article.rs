@@ -13,9 +13,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::date::ArticleDate;
 use crate::error::ExtrablattError;
+use crate::extrablatt::Config;
 use crate::extract::{DefaultExtractor, Extractor};
 use crate::language::Language;
-use crate::newspaper::Config;
 
 /// Extension for documents that are considered valid sources for articles.
 pub const ALLOWED_FILE_EXT: [&str; 12] = [

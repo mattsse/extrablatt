@@ -1,10 +1,10 @@
 use futures::stream::StreamExt;
 
-use extrablatt::Newspaper;
+use extrablatt::Extrablatt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let newspaper = Newspaper::builder("https://cnn.com/")?.build().await?;
+    let newspaper = Extrablatt::builder("https://cnn.com/")?.build().await?;
 
     let mut stream = newspaper.into_stream();
     while let Some(article) = stream.next().await {

@@ -28,13 +28,13 @@ Full Documentation [https://docs.rs/extrablatt](https://docs.rs/extrablatt)
 Extract all Articles from a news outlet.
 
 ````rust
-use extrablatt::Newspaper;
+use extrablatt::Extrablatt;
 use futures::StreamExt;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
-    let newspaper = Newspaper::builder("https://cnn.com/")?.build().await?;
+    let newspaper = Extrablatt::builder("https://cnn.com/")?.build().await?;
 
     let mut stream = newspaper.into_stream().await;
     

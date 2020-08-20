@@ -20,7 +20,7 @@ use crate::article::{
 use crate::clean::DocumentCleaner;
 use crate::date::{ArticleDate, DateExtractor, RE_DATE_SEGMENTS_M_D_Y, RE_DATE_SEGMENTS_Y_M_D};
 
-use crate::newspaper::Category;
+use crate::extrablatt::Category;
 use crate::stopwords::CATEGORY_STOPWORDS;
 use crate::text::{TextExtractor, TextNode};
 use crate::video::VideoNode;

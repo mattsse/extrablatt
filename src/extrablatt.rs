@@ -23,7 +23,7 @@ use crate::language::Language;
 use crate::text::TextExtractor;
 
 #[derive(Debug)]
-pub struct Newspaper<TExtractor: Extractor = DefaultExtractor> {
+pub struct Extrablatt<TExtractor: Extractor = DefaultExtractor> {
     /// The [`reqwest::Client`] that drives requests.
     client: Client,
     /// The expected language of this newspaper.
@@ -44,17 +44,17 @@ pub struct Newspaper<TExtractor: Extractor = DefaultExtractor> {
     config: Config,
 }
 
-impl Newspaper<DefaultExtractor> {
-    /// Convenience method for creating a new [`NewspaperBuilder`].
+impl Extrablatt<DefaultExtractor> {
+    /// Convenience method for creating a new [`ExtrablattBuilder`].
     ///
-    /// Same as calling [`NewspaperBuilder::new`].
+    /// Same as calling [`ExtrablattBuilder::new`].
     #[inline]
-    pub fn builder<T: IntoUrl>(url: T) -> Result<NewspaperBuilder> {
-        NewspaperBuilder::new(url)
+    pub fn builder<T: IntoUrl>(url: T) -> Result<ExtrablattBuilder> {
+        ExtrablattBuilder::new(url)
     }
 }
 
-impl<TExtractor: Extractor> Newspaper<TExtractor> {
+impl<TExtractor: Extractor> Extrablatt<TExtractor> {
     #[inline]
     pub fn language(&self) -> &Language {
         &self.language
@@ -113,10 +113,10 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
     /// Loop over all downloaded articles.
     ///
     /// ```edition2018
-    /// # use extrablatt::Newspaper;
+    /// # use extrablatt::Extrablatt;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let mut newspaper = Newspaper::builder("https://cnn.com/")?.build().await?;
+    ///     let mut newspaper = Extrablatt::builder("https://cnn.com/")?.build().await?;
     ///     newspaper.download_all_outstanding_categories().await?;
     ///     for(url, content) in newspaper.download_articles().await.successes() {
     ///         // ...
@@ -362,7 +362,7 @@ impl<TExtractor: Extractor> Newspaper<TExtractor> {
     }
 }
 
-impl<TExtractor: Extractor + Unpin> Newspaper<TExtractor> {
+impl<TExtractor: Extractor + Unpin> Extrablatt<TExtractor> {
     /// Converts the newspaper into a stream, yielding all available
     /// [`extrablatt::Article`]s.
     pub fn into_stream(
@@ -457,7 +457,7 @@ type ReadyResponse = (usize, std::result::Result<(Url, Bytes), ExtrablattError>)
 #[must_use = "streams do nothing unless polled"]
 pub struct ArticleStream<TExtractor: Extractor> {
     /// The origin newspaper.
-    paper: Newspaper<TExtractor>,
+    paper: Extrablatt<TExtractor>,
     /// Pending responses for an Article html.
     article_responses: Vec<PaperResponse>,
     /// Pending responses for Category html.
@@ -502,7 +502,7 @@ impl<TExtractor: Extractor + Unpin> ArticleStream<TExtractor> {
         url: T,
         extractor: TExtractor,
     ) -> Result<ArticleStream<TExtractor>> {
-        let paper = NewspaperBuilder::new(url)?
+        let paper = ExtrablattBuilder::new(url)?
             .build_with_extractor(extractor)
             .await?;
 
@@ -659,7 +659,7 @@ impl<TExtractor: Extractor + Unpin> Stream for ArticleStream<TExtractor> {
 }
 
 #[derive(Debug)]
-pub struct NewspaperBuilder {
+pub struct ExtrablattBuilder {
     base_url: Option<Url>,
     config: Option<Config>,
     language: Option<Language>,
@@ -669,7 +669,7 @@ pub struct NewspaperBuilder {
     categories: bool,
 }
 
-impl NewspaperBuilder {
+impl ExtrablattBuilder {
     pub fn new<T: IntoUrl>(base_url: T) -> Result<Self> {
         Ok(Self {
             base_url: Some(base_url.into_url()?),
@@ -704,7 +704,7 @@ impl NewspaperBuilder {
     pub async fn build_with_extractor<TExtractor: Extractor>(
         self,
         extractor: TExtractor,
-    ) -> Result<Newspaper<TExtractor>> {
+    ) -> Result<Extrablatt<TExtractor>> {
         let base_url = self
             .base_url
             .context("Url of the article must be initialized.")?;
@@ -738,7 +738,7 @@ impl NewspaperBuilder {
             .await
             .map_err(|(_, err)| err)?;
 
-        let mut paper = Newspaper {
+        let mut paper = Extrablatt {
             client,
             language: self.language.unwrap_or_default(),
             main_page,
@@ -759,7 +759,7 @@ impl NewspaperBuilder {
         Ok(paper)
     }
 
-    pub async fn build(self) -> Result<Newspaper> {
+    pub async fn build(self) -> Result<Extrablatt> {
         self.build_with_extractor(Default::default()).await
     }
 }

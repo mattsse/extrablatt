@@ -5,7 +5,7 @@ use structopt::StructOpt;
 use url::Url;
 
 use extrablatt::article::PureArticle;
-use extrablatt::{Article, Category, Config, Newspaper};
+use extrablatt::{Article, Category, Config, Extrablatt};
 
 #[allow(missing_docs)]
 #[derive(Debug, StructOpt)]
@@ -55,7 +55,7 @@ impl App {
                 let config = opts.as_config();
                 (
                     opts.output,
-                    Newspaper::builder(url)
+                    Extrablatt::builder(url)
                         .unwrap()
                         .config(config)
                         .build()
