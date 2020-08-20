@@ -1,4 +1,4 @@
-/// Rexported to implement custom extractors.
+/// Reexported to implement custom extractors.
 pub use select;
 
 pub use article::{Article, PureArticle};

@@ -9,6 +9,7 @@ use select::predicate::{Name, Predicate};
 use crate::clean::{DefaultDocumentCleaner, DocumentCleaner};
 use crate::video::VideoNode;
 use crate::Language;
+use url::Url;
 
 pub const PUNCTUATION: &str = r###",."'!?&-/:;()#$%*+<=>@[\]^_`{|}~"###;
 
@@ -74,6 +75,16 @@ impl<'a> TextNode<'a> {
     /// parts of the article
     pub fn clean_text(&self) -> String {
         DefaultDocumentCleaner::clean_node_text(&self.inner)
+    }
+
+    /// Extract all of the images of the document.
+    pub fn images(&self, base_url: Option<&Url>) -> Vec<Url> {
+        let options = Url::options().base_url(base_url);
+        self.inner
+            .find(Name("img"))
+            .filter_map(|n| n.attr("href").map(str::trim))
+            .filter_map(|url| options.parse(url).ok())
+            .collect()
     }
 
     /// Extract all the nodes that hold video data

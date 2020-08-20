@@ -31,6 +31,7 @@ pub trait DocumentCleaner {
         fn recur_text<T: DocumentCleaner + ?Sized>(node: &Node, string: &mut String) {
             if !T::has_bad_attr(node) {
                 if let Some(text) = node.as_text() {
+                    dbg!(&node);
                     string.push_str(text);
                 }
             }

@@ -543,8 +543,7 @@ pub trait Extractor {
     ) -> ArticleContent<'a> {
         let mut builder = ArticleContent::builder()
             .authors(self.authors(doc))
-            .keywords(self.meta_keywords(doc))
-            .images(self.image_urls(doc, base_url));
+            .keywords(self.meta_keywords(doc));
 
         let lang = if let Some(meta_lang) = self.meta_language(doc) {
             builder = builder.language(meta_lang.clone());
@@ -564,6 +563,7 @@ pub trait Extractor {
                         .collect(),
                 )
                 .text(txt_node.text().into())
+                .images(txt_node.images(base_url));
         }
 
         if let Some(description) = self.meta_description(doc) {
