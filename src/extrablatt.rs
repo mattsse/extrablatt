@@ -117,7 +117,7 @@ impl<TExtractor: Extractor> Extrablatt<TExtractor> {
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ///     let mut newspaper = Extrablatt::builder("https://cnn.com/")?.build().await?;
-    ///     newspaper.download_all_outstanding_categories().await?;
+    ///     newspaper.download_all_remaining_categories().await?;
     ///     for(url, content) in newspaper.download_articles().await.successes() {
     ///         // ...
     ///     }
@@ -315,7 +315,7 @@ impl<TExtractor: Extractor> Extrablatt<TExtractor> {
 
     /// Download and store all categories and their identified articles that
     /// haven't been requested yet.
-    pub async fn download_all_outstanding_categories(
+    pub async fn download_all_remaining_categories(
         &mut self,
     ) -> Vec<std::result::Result<Category, (Category, ExtrablattError)>> {
         let items: Vec<_> = self
@@ -869,38 +869,23 @@ impl DocumentDownloadState {
     }
 
     pub fn is_http_failure(&self) -> bool {
-        match self {
-            DocumentDownloadState::HttpRequestFailure { .. } => true,
-            _ => false,
-        }
+        matches!(self, DocumentDownloadState::HttpRequestFailure { .. })
     }
 
     pub fn is_no_http_success_response(&self) -> bool {
-        match self {
-            DocumentDownloadState::NoHttpSuccessResponse { .. } => true,
-            _ => false,
-        }
+        matches!(self, DocumentDownloadState::NoHttpSuccessResponse { .. })
     }
 
     pub fn is_doc_parsing_failure(&self) -> bool {
-        match self {
-            DocumentDownloadState::DocumentReadFailure { .. } => true,
-            _ => false,
-        }
+        matches!(self, DocumentDownloadState::DocumentReadFailure { .. })
     }
 
     pub fn is_not_requested(&self) -> bool {
-        match self {
-            DocumentDownloadState::NotRequested { .. } => true,
-            _ => false,
-        }
+        matches!(self, DocumentDownloadState::NotRequested { .. })
     }
 
     pub fn is_success(&self) -> bool {
-        match self {
-            DocumentDownloadState::Success { .. } => true,
-            _ => false,
-        }
+        matches!(self, DocumentDownloadState::Success { .. })
     }
 }
 
