@@ -62,3 +62,31 @@ jobs:
         with:
           command: clippy
           args: -- -D warnings
+
+  wasm:
+    name: wasm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: wasm32-unknown-unknown
+          override: true
+
+      - name: Install node
+        uses: actions/setup-node@v1
+        with:
+          node-version: '12'
+
+      - name: Install wasm-pack
+        run: |
+          export RUST_BACKTRACE=1
+          curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+          wasm-pack --version
+      - name: Build and Test
+        run: wasm-pack test --node
+        env:
+          RUST_VERSION: stable
+          WASM: wasm_simple
