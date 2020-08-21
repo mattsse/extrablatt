@@ -13,7 +13,6 @@ pub mod category;
 pub mod clean;
 pub mod date;
 mod error;
-#[cfg(not(target_arch = "wasm32"))]
 pub mod extrablatt;
 pub mod extract;
 pub mod image;

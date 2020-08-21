@@ -7,7 +7,9 @@ use fnv::FnvHashMap;
 use futures::stream::{self, Stream};
 use futures::task::Poll;
 use futures::{Future, FutureExt, StreamExt, TryFutureExt};
-use reqwest::header::{HeaderMap, USER_AGENT};
+use reqwest::header::HeaderMap;
+#[cfg(not(target_arch = "wasm32"))]
+use reqwest::header::USER_AGENT;
 use reqwest::Response;
 use reqwest::{Client, IntoUrl, Url};
 use select::document::Document;
@@ -429,22 +431,23 @@ impl<TExtractor: Extractor + Unpin> Extrablatt<TExtractor> {
     }
 
     fn get_response(&self, url: Url) -> PaperResponse {
-        self.client
-            .get(url.clone())
-            .send()
-            .map_err(|error| ExtrablattError::HttpRequestFailure { error })
-            .and_then(|response| async {
-                if !response.status().is_success() {
-                    Err(ExtrablattError::NoHttpSuccessResponse { response })
-                } else {
-                    response
-                        .bytes()
-                        .await
-                        .map(|bytes| (url, bytes))
-                        .map_err(|error| ExtrablattError::HttpRequestFailure { error })
-                }
-            })
-            .boxed()
+        Box::pin(
+            self.client
+                .get(url.clone())
+                .send()
+                .map_err(|error| ExtrablattError::HttpRequestFailure { error })
+                .and_then(|response| async {
+                    if !response.status().is_success() {
+                        Err(ExtrablattError::NoHttpSuccessResponse { response })
+                    } else {
+                        response
+                            .bytes()
+                            .await
+                            .map(|bytes| (url, bytes))
+                            .map_err(|error| ExtrablattError::HttpRequestFailure { error })
+                    }
+                }),
+        )
     }
 }
 
@@ -468,6 +471,7 @@ pub struct ArticleStream<TExtractor: Extractor> {
     categories: Vec<(Category, Document)>,
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 impl ArticleStream<DefaultExtractor> {
     /// Fetch all article urls from the page the url points to and
     /// return a new stream of articles using the
@@ -715,28 +719,37 @@ impl ExtrablattBuilder {
 
         let config = self.config.unwrap_or_default();
 
-        let mut headers = self.headers.unwrap_or_else(|| HeaderMap::with_capacity(1));
+        // TODO headers currently not supported in reqwest wasm
+        #[cfg(target_arch = "wasm32")]
+        let client = { Client::builder().build()? };
 
-        if !headers.contains_key(USER_AGENT) {
-            headers.insert(
-                USER_AGENT,
-                config.user_agent.parse().context(format!(
-                    "Failed to parse user agent header name: {}",
-                    config.user_agent
-                ))?,
-            );
-        }
+        #[cfg(not(target_arch = "wasm32"))]
+        let client = {
+            let mut headers = self.headers.unwrap_or_else(|| HeaderMap::with_capacity(1));
 
-        let client = Client::builder()
-            .default_headers(headers)
-            .timeout(config.request_timeout)
-            .build()?;
+            if !headers.contains_key(USER_AGENT) {
+                headers.insert(
+                    USER_AGENT,
+                    config.user_agent.parse().context(format!(
+                        "Failed to parse user agent header name: {}",
+                        config.user_agent
+                    ))?,
+                );
+            }
+
+            Client::builder()
+                .default_headers(headers)
+                .timeout(config.request_timeout)
+                .build()?
+        };
 
         let resp = client.get(base_url.clone()).send().await;
 
+        // TODO fix error
         let (main_page, _) = DocumentDownloadState::from_response(resp)
             .await
-            .map_err(|(_, err)| err)?;
+            .map_err(|_| anyhow!(""))?;
+        // .map_err(|(_, err)| err)?;
 
         let mut paper = Extrablatt {
             client,

@@ -3,6 +3,7 @@ use std::hash::{Hash, Hasher};
 use std::time::Duration;
 
 use anyhow::{Context, Result};
+#[cfg(not(target_arch = "wasm32"))]
 use reqwest::header::{HeaderMap, USER_AGENT};
 use reqwest::{Client, IntoUrl, Url};
 use select::document::Document;
@@ -10,7 +11,6 @@ use select::document::Document;
 use serde::{Deserialize, Serialize};
 
 use crate::date::ArticleDate;
-use crate::error::ExtrablattError;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::extrablatt::Config;
 use crate::extract::{DefaultExtractor, Extractor};
@@ -163,14 +163,12 @@ impl Article {
     /// ```no_run
     ///  Article::builder(url)?.get().await?.content
     /// ```
-    #[cfg(not(target_arch = "wasm32"))]
     pub async fn content<T: IntoUrl>(url: T) -> Result<ArticleContent<'static>> {
         let article = Self::get(url).await?;
         Ok(article.content)
     }
 
     /// Get the [`Article`] for the `url`
-    #[cfg(not(target_arch = "wasm32"))]
     pub async fn get<T: IntoUrl>(url: T) -> Result<Article> {
         Self::builder(url)?.get().await
     }
@@ -178,7 +176,6 @@ impl Article {
     /// Convenience method for creating a new [`ArticleBuilder`]
     ///
     /// Same as calling [`ArticleBuilder::new`]
-    #[cfg(not(target_arch = "wasm32"))]
     pub fn builder<T: IntoUrl>(url: T) -> Result<ArticleBuilder> {
         ArticleBuilder::new(url)
     }
@@ -242,14 +239,12 @@ impl ArticleBuilder {
 
     /// Downloads the article and extract it's content using the
     /// [`extrablatt::DefaultExtractor`].
-    #[cfg(not(target_arch = "wasm32"))]
     pub async fn get(self) -> Result<Article> {
         self.get_with_extractor(&DefaultExtractor::default()).await
     }
 
     /// Downloads the article and extracts it's content using the provided
     /// [`extrablatt::Extractor`].
-    #[cfg(not(target_arch = "wasm32"))]
     pub async fn get_with_extractor<TExtract: Extractor>(
         self,
         extractor: &TExtract,
@@ -258,31 +253,35 @@ impl ArticleBuilder {
             .url
             .context("Url of the article must be initialized.")?;
 
-        let timeout = self
-            .timeout
-            .unwrap_or_else(|| Duration::from_secs(Config::DEFAULT_REQUEST_TIMEOUT_SEC));
+        #[cfg(target_arch = "wasm32")]
+        let builder = Client::builder();
 
-        let mut headers = HeaderMap::with_capacity(1);
+        #[cfg(not(target_arch = "wasm32"))]
+        let builder = {
+            let timeout = self
+                .timeout
+                .unwrap_or_else(|| Duration::from_secs(Config::DEFAULT_REQUEST_TIMEOUT_SEC));
 
-        headers.insert(
-            USER_AGENT,
-            self.browser_user_agent
-                .map(|x| x.parse())
-                .unwrap_or_else(|| Config::user_agent().parse())
-                .context("Failed to parse user agent header.")?,
-        );
+            let mut headers = HeaderMap::with_capacity(1);
 
-        let resp = Client::builder()
-            .timeout(timeout)
-            .default_headers(headers)
-            .build()?
-            .get(url)
-            .send()
-            .await?;
+            headers.insert(
+                USER_AGENT,
+                self.browser_user_agent
+                    .map(|x| x.parse())
+                    .unwrap_or_else(|| Config::user_agent().parse())
+                    .context("Failed to parse user agent header.")?,
+            );
+
+            Client::builder().default_headers(headers).timeout(timeout)
+        };
+
+        let resp = builder.build()?.get(url).send().await?;
 
         if !resp.status().is_success() {
-            let msg = format!("Unsuccessful request to {:?}", resp.url());
-            return Err(ExtrablattError::NoHttpSuccessResponse { response: resp }).context(msg);
+            // let msg = format!("Unsuccessful request to {:?}", resp.url());
+            // return ExtrablattError::NoHttpSuccessResponse { response: resp
+            // }.context(msg);
+            return Err(anyhow::anyhow!("Unsuccessful request to {:?}", resp.url()).into());
         }
 
         let url = resp.url().to_owned();
