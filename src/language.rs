@@ -5,7 +5,7 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 
 use crate::stopwords::*;
-use crate::text::{TextNodeExtractor, WordsStats};
+use crate::text::{ArticleTextNodeExtractor, WordsStats};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde0", derive(Serialize, Deserialize))]
@@ -137,7 +137,7 @@ impl Language {
     /// language are available.
     pub fn stopword_count(&self, txt: &str) -> Option<WordsStats> {
         if let Some(stopwords) = self.stopwords() {
-            let (word_count, stopword_count) = TextNodeExtractor::words(txt).fold(
+            let (word_count, stopword_count) = ArticleTextNodeExtractor::words(txt).fold(
                 (0usize, 0usize),
                 |(word_count, mut stopword_count), word| {
                     if stopwords.contains(&word) {

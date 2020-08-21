@@ -20,7 +20,7 @@ use crate::article::{Article, ArticleContent, ArticleUrl, PureArticle};
 use crate::error::ExtrablattError;
 use crate::extract::{DefaultExtractor, Extractor};
 use crate::language::Language;
-use crate::text::TextNodeExtractor;
+use crate::text::ArticleTextNodeExtractor;
 
 #[derive(Debug)]
 pub struct Extrablatt<TExtractor: Extractor = DefaultExtractor> {
@@ -1043,7 +1043,7 @@ impl Config {
         let mut words = None;
         if let Some(min_word_count) = self.min_word_count {
             if let Some(txt) = &article.text {
-                let words_ctn = TextNodeExtractor::words(txt.as_ref()).count();
+                let words_ctn = ArticleTextNodeExtractor::words(txt.as_ref()).count();
                 if min_word_count > words_ctn {
                     return false;
                 }
@@ -1056,7 +1056,7 @@ impl Config {
         if let Some(max_word_count) = self.max_word_count {
             if let Some(txt) = &article.text {
                 let words_ctn =
-                    words.unwrap_or_else(|| TextNodeExtractor::words(txt.as_ref()).count());
+                    words.unwrap_or_else(|| ArticleTextNodeExtractor::words(txt.as_ref()).count());
                 if max_word_count < words_ctn {
                     return false;
                 }

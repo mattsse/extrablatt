@@ -22,7 +22,7 @@ use crate::date::{ArticleDate, DateExtractor, RE_DATE_SEGMENTS_M_D_Y, RE_DATE_SE
 
 use crate::extrablatt::Category;
 use crate::stopwords::CATEGORY_STOPWORDS;
-use crate::text::{TextNode, TextNodeExtractor};
+use crate::text::{ArticleTextNode, ArticleTextNodeExtractor};
 use crate::video::VideoNode;
 use crate::Language;
 
@@ -337,20 +337,20 @@ pub trait Extractor {
         lang: Language,
         cleaner: T,
     ) -> Option<Cow<'a, str>> {
-        self.text_node(doc, lang)
+        self.article_node(doc, lang)
             .map(|n| cleaner.clean_node_text(&*n).into())
     }
 
     /// Detect the [`select::Node`] that contains the article's text.
-    fn text_node<'a>(&self, doc: &'a Document, lang: Language) -> Option<TextNode<'a>> {
+    fn article_node<'a>(&self, doc: &'a Document, lang: Language) -> Option<ArticleTextNode<'a>> {
         let mut iter =
-            doc.find(Name("body").descendant(TextNodeExtractor::article_body_predicate()));
+            doc.find(Name("body").descendant(ArticleTextNodeExtractor::article_body_predicate()));
         if let Some(node) = iter.next() {
             if iter.next().is_none() {
-                return Some(TextNode::new(node));
+                return Some(ArticleTextNode::new(node));
             }
         }
-        TextNodeExtractor::calculate_best_node(doc, lang)
+        ArticleTextNodeExtractor::calculate_best_node(doc, lang)
     }
 
     /// Extract the `href` attribute for all `<a>` tags of the document.
@@ -561,7 +561,7 @@ pub trait Extractor {
             lang.unwrap_or_default()
         };
 
-        if let Some(txt_node) = self.text_node(doc, lang) {
+        if let Some(txt_node) = self.article_node(doc, lang) {
             builder = builder
                 .videos(
                     txt_node
@@ -616,7 +616,7 @@ pub trait Extractor {
 
     /// All video content in the article.
     fn videos<'a>(&self, doc: &'a Document, lang: Option<Language>) -> Vec<VideoNode<'a>> {
-        if let Some(node) = self.text_node(doc, lang.unwrap_or_default()) {
+        if let Some(node) = self.article_node(doc, lang.unwrap_or_default()) {
             node.videos()
         } else {
             Vec::new()

@@ -4,7 +4,7 @@ use std::ops::Deref;
 
 use select::document::Document;
 use select::node::Node;
-use select::predicate::{Any, Attr, Name, Predicate};
+use select::predicate::{Attr, Name, Predicate};
 
 use crate::clean::{DefaultDocumentCleaner, DocumentCleaner};
 use crate::video::VideoNode;
@@ -72,11 +72,11 @@ impl<'a> Iterator for TextNodeFind<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct TextNode<'a> {
+pub struct ArticleTextNode<'a> {
     inner: Node<'a>,
 }
 
-impl<'a> TextNode<'a> {
+impl<'a> ArticleTextNode<'a> {
     pub fn new(inner: Node<'a>) -> Self {
         Self { inner }
     }
@@ -121,7 +121,7 @@ impl<'a> TextNode<'a> {
     }
 }
 
-impl<'a> Deref for TextNode<'a> {
+impl<'a> Deref for ArticleTextNode<'a> {
     type Target = Node<'a>;
 
     fn deref(&self) -> &Self::Target {
@@ -129,9 +129,9 @@ impl<'a> Deref for TextNode<'a> {
     }
 }
 
-pub struct TextNodeExtractor;
+pub struct ArticleTextNodeExtractor;
 
-impl TextNodeExtractor {
+impl ArticleTextNodeExtractor {
     pub const MINIMUM_STOPWORD_COUNT: usize = 5;
 
     pub const MAX_STEPSAWAY_FROM_NODE: usize = 3;
@@ -147,11 +147,11 @@ impl TextNodeExtractor {
         }
     }
 
-    pub fn calculate_best_node(doc: &Document, lang: Language) -> Option<TextNode> {
+    pub fn calculate_best_node(doc: &Document, lang: Language) -> Option<ArticleTextNode> {
         let mut starting_boost = 1.0;
 
-        let txt_nodes: Vec<_> = TextNodeExtractor::nodes_to_check(doc)
-            .filter(|n| !TextNodeExtractor::is_high_link_density(n))
+        let txt_nodes: Vec<_> = ArticleTextNodeExtractor::nodes_to_check(doc)
+            .filter(|n| !ArticleTextNodeExtractor::is_high_link_density(n))
             .filter_map(|node| {
                 if let Some(stats) = node
                     .first_children_text()
@@ -174,7 +174,7 @@ impl TextNodeExtractor {
         for (i, (node, stats)) in txt_nodes.iter().enumerate() {
             let mut boost_score = 0.0;
 
-            if TextNodeExtractor::is_boostable(node, lang.clone()) {
+            if ArticleTextNodeExtractor::is_boostable(node, lang.clone()) {
                 boost_score = (1.0 / starting_boost) * 50.0;
                 starting_boost += 1.0;
             }
@@ -230,7 +230,7 @@ impl TextNodeExtractor {
             }
         }
 
-        index.map(|i| TextNode::new(Node::new(doc, i).unwrap()))
+        index.map(|i| ArticleTextNode::new(Node::new(doc, i).unwrap()))
     }
 
     /// Returns all nodes we want to search on like paragraphs and tables
@@ -246,14 +246,14 @@ impl TextNodeExtractor {
     fn is_boostable(node: &Node, lang: Language) -> bool {
         let mut steps_away = 0;
         while let Some(sibling) = node.prev().filter(|n| n.is(Name("p"))) {
-            if steps_away >= TextNodeExtractor::MAX_STEPSAWAY_FROM_NODE {
+            if steps_away >= ArticleTextNodeExtractor::MAX_STEPSAWAY_FROM_NODE {
                 return false;
             }
             if let Some(stats) = sibling
                 .first_children_text()
                 .and_then(|txt| lang.stopword_count(txt))
             {
-                if stats.stopword_count > TextNodeExtractor::MINIMUM_STOPWORD_COUNT {
+                if stats.stopword_count > ArticleTextNodeExtractor::MINIMUM_STOPWORD_COUNT {
                     return true;
                 }
             }
