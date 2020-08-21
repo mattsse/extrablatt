@@ -6,7 +6,7 @@ edition = "2018"
 repository = "https://github.com/mattsse/extrablatt"
 categories = ["parsing"]
 keywords = ["parser", "web", "news"]
-description= "News, articles and text scraper"
+description = "News, articles and text scraper"
 documentation = "https://docs.rs/extrablatt/"
 
 [badges]
@@ -24,7 +24,6 @@ serde_json = { version = "1.0", optional = true }
 select = { git = "https://github.com/utkarshkukreti/select.rs" }
 anyhow = "1.0"
 log = "0.4"
-tokio = { version = "0.2", features = ["full"] }
 thiserror = "1.0"
 reqwest = "0.10"
 archiveis = { version = "0.4", optional = true }
@@ -43,3 +42,6 @@ futures = "0.3"
 cli = ["structopt", "serde0", "serde_json"]
 archive = ["archiveis"]
 serde0 = ["serde", "url/serde", "chrono/serde"]
+
+[dev-dependencies]
+tokio = { version = "0.2", features = ["macros"] }
