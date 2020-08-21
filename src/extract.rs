@@ -342,6 +342,11 @@ pub trait Extractor {
     }
 
     /// Detect the [`select::Node`] that contains the article's text.
+    ///
+    /// If the `doc`'s body contains a node that matches the
+    /// [`crate::text::ARTICLE_BODY_ATTR`] attribute selectors, this node will
+    /// be selected. Otherwise the article node will be calculated by analysing
+    /// and scoring the textual content of text nodes.
     fn article_node<'a>(&self, doc: &'a Document, lang: Language) -> Option<ArticleTextNode<'a>> {
         let mut iter =
             doc.find(Name("body").descendant(ArticleTextNodeExtractor::article_body_predicate()));
