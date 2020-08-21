@@ -1055,7 +1055,8 @@ impl Config {
 
         if let Some(max_word_count) = self.max_word_count {
             if let Some(txt) = &article.text {
-                let words_ctn = words.unwrap_or_else(|| TextNodeExtractor::words(txt.as_ref()).count());
+                let words_ctn =
+                    words.unwrap_or_else(|| TextNodeExtractor::words(txt.as_ref()).count());
                 if max_word_count < words_ctn {
                     return false;
                 }

@@ -22,7 +22,7 @@ use crate::date::{ArticleDate, DateExtractor, RE_DATE_SEGMENTS_M_D_Y, RE_DATE_SE
 
 use crate::extrablatt::Category;
 use crate::stopwords::CATEGORY_STOPWORDS;
-use crate::text::{TextNodeExtractor, TextNode};
+use crate::text::{TextNode, TextNodeExtractor};
 use crate::video::VideoNode;
 use crate::Language;
 
@@ -554,7 +554,7 @@ pub trait Extractor {
             lang.unwrap_or_default()
         };
 
-        if let Some(txt_node) = self.text_node(doc, lang.clone()) {
+        if let Some(txt_node) = self.text_node(doc, lang) {
             builder = builder
                 .videos(
                     txt_node

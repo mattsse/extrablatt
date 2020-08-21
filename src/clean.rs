@@ -12,8 +12,7 @@ lazy_static! {
 
 }
 
-pub const BAD_TAG_NAMES: &[&'static str; 5] =
-    &["script", "style", "figcaption", "figure", "button"];
+pub const BAD_TAG_NAMES: &[&str; 5] = &["script", "style", "figcaption", "figure", "button"];
 
 const ATTR_TO_CHECK: [&str; 3] = ["id", "class", "name"];
 
