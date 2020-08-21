@@ -78,10 +78,16 @@ impl<P> CommonCleaner<P>
 where
     P: Fn(&Node) -> bool,
 {
+    /// Create a new Cleaner that ignores [`BAD_TAG_NAMES`] nodes by default and
+    /// decides whether to extract text from a node based on the `is_good_node`
+    /// predicate
     pub fn new(is_good_node: P) -> Self {
         Self::with_names(is_good_node, BAD_TAG_NAMES.iter().cloned())
     }
 
+    /// Create a new Cleaner that ignores `bad_names` nodes by default and
+    /// decides whether to extract text from a node based on the `is_good_node`
+    /// predicate
     pub fn with_names<T, I>(is_good_node: P, bad_names: T) -> Self
     where
         T: IntoIterator<Item = I>,
