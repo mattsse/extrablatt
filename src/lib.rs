@@ -2,11 +2,14 @@
 pub use select;
 
 pub use article::{Article, PureArticle};
-pub use extrablatt::{ArticleStream, Category, Config, Extrablatt, ExtrablattBuilder};
+pub use category::Category;
+#[cfg(not(target_arch = "wasm32"))]
+pub use extrablatt::{ArticleStream, Config, Extrablatt, ExtrablattBuilder};
 pub use extract::{DefaultExtractor, Extractor};
 pub use language::Language;
 
 pub mod article;
+pub mod category;
 pub mod clean;
 pub mod date;
 mod error;
