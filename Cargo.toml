@@ -1,6 +1,7 @@
 [package]
 name = "extrablatt"
 version = "0.1.0"
+license = "MIT OR Apache-2.0"
 authors = ["Matthias Seitz <matthias.seitz@tum.de>"]
 edition = "2018"
 repository = "https://github.com/mattsse/extrablatt"
@@ -53,3 +54,7 @@ web-sys = "0.3"
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 wasm-bindgen-test = "0.3"
+
+
+[workspace]
+members = ["extrablatt-web"]
