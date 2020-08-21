@@ -86,7 +86,7 @@ jobs:
           curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
           wasm-pack --version
       - name: Build and Test
-        run: wasm-pack test --node
+        run: wasm-pack test --node -- --lib
         env:
           RUST_VERSION: stable
           WASM: wasm_simple
