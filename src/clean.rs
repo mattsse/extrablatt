@@ -1,7 +1,7 @@
 use regex::Regex;
 
 use lazy_static::lazy_static;
-use select::node::Node;
+use select::node::{Descendants, Node};
 use select::predicate::{Name, Predicate};
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -81,11 +81,43 @@ pub trait DocumentCleaner {
     fn is_bad_node_name(&self, node: Node) -> bool {
         is_bad_node(node)
     }
+
+    /// Create an iterator that yields every node that this cleaner considers
+    /// good
+    fn iter_clean_nodes<'a>(&'a self, node: Node<'a>) -> CleanNodeIter<'a, Self>
+    where
+        Self: Sized,
+    {
+        CleanNodeIter {
+            cleaner: self,
+            inner: node.descendants(),
+        }
+    }
 }
 
+/// An Iterator that only yields those nodes that the `cleaner` considers good.
 pub struct CleanNodeIter<'a, T: DocumentCleaner> {
     cleaner: &'a T,
-    node: Node<'a>,
+    inner: Descendants<'a>,
+}
+
+impl<'a, T: DocumentCleaner> Iterator for CleanNodeIter<'a, T> {
+    type Item = Node<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let node = self.inner.next()?;
+        if self.cleaner.is_bad_node_name(node) || !self.cleaner.is_good_node(node) {
+            // skip every node under this bad node
+            let mut iter = node.descendants();
+            while let Some(ignore) = iter.next() {
+                let next = self.inner.next()?;
+                if ignore.index() != next.index() {
+                    return Some(next);
+                }
+            }
+        }
+        Some(node)
+    }
 }
 
 /// A standard implementation of a cleaner that only extracts good textual

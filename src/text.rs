@@ -100,7 +100,9 @@ impl<'a> ArticleTextNode<'a> {
     /// Extract all the links within the node's descendants
     pub fn references(&self) -> Vec<Url> {
         let mut uniques = HashSet::new();
-        self.find(Name("a"))
+        DefaultDocumentCleaner
+            .iter_clean_nodes(self.inner)
+            .filter(|n| Name("a").matches(n))
             .filter_map(|n| n.attr("href").map(str::trim))
             .filter(|href| uniques.insert(*href))
             .filter_map(|url| Url::parse(url).ok())
