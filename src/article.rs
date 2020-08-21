@@ -315,6 +315,7 @@ pub struct ArticleContent<'a> {
     pub language: Option<Language>,
     pub thumbnail: Option<Url>,
     pub top_image: Option<Url>,
+    pub references: Vec<Url>,
     pub images: Vec<Url>,
     pub videos: Vec<Url>,
 }
@@ -347,6 +348,7 @@ impl<'a> ArticleContent<'a> {
             language: self.language,
             thumbnail: self.thumbnail,
             top_image: self.top_image,
+            references: self.references,
             images: self.images,
             videos: self.videos,
         }
@@ -364,6 +366,7 @@ pub struct ArticleContentBuilder<'a> {
     pub language: Option<Language>,
     pub thumbnail: Option<Url>,
     pub top_image: Option<Url>,
+    pub references: Option<Vec<Url>>,
     pub images: Option<Vec<Url>>,
     pub videos: Option<Vec<Url>>,
 }
@@ -414,6 +417,11 @@ impl<'a> ArticleContentBuilder<'a> {
         self
     }
 
+    pub fn references(mut self, references: Vec<Url>) -> Self {
+        self.references = Some(references);
+        self
+    }
+
     pub fn images(mut self, images: Vec<Url>) -> Self {
         self.images = Some(images);
         self
@@ -435,6 +443,7 @@ impl<'a> ArticleContentBuilder<'a> {
             language: self.language,
             thumbnail: self.thumbnail,
             top_image: self.top_image,
+            references: self.references.unwrap_or_default(),
             images: self.images.unwrap_or_default(),
             videos: self.videos.unwrap_or_default(),
         }

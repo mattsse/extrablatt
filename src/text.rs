@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use std::ops::Deref;
 
@@ -84,7 +84,7 @@ impl<'a> ArticleTextNode<'a> {
     /// Extract the content from the node, but ignore those that not contain
     /// parts of the article
     pub fn clean_text(&self) -> String {
-        DefaultDocumentCleaner.clean_node_text(&self.inner)
+        DefaultDocumentCleaner.clean_node_text(self.inner)
     }
 
     /// Extract all of the images of the document.
@@ -94,6 +94,16 @@ impl<'a> ArticleTextNode<'a> {
             .find(Name("img"))
             .filter_map(|n| n.attr("href").map(str::trim))
             .filter_map(|url| options.parse(url).ok())
+            .collect()
+    }
+
+    /// Extract all the links within the node's descendants
+    pub fn references(&self) -> Vec<Url> {
+        let mut uniques = HashSet::new();
+        self.find(Name("a"))
+            .filter_map(|n| n.attr("href").map(str::trim))
+            .filter(|href| uniques.insert(*href))
+            .filter_map(|url| Url::parse(url).ok())
             .collect()
     }
 

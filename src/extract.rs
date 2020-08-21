@@ -338,7 +338,7 @@ pub trait Extractor {
         cleaner: T,
     ) -> Option<Cow<'a, str>> {
         self.article_node(doc, lang)
-            .map(|n| cleaner.clean_node_text(&*n).into())
+            .map(|n| cleaner.clean_node_text(*n).into())
     }
 
     /// Detect the [`select::Node`] that contains the article's text.
@@ -576,6 +576,7 @@ pub trait Extractor {
                         .filter_map(|url| url.ok())
                         .collect(),
                 )
+                .references(txt_node.references())
                 .text(txt_node.clean_text().into())
                 .images(txt_node.images(base_url));
         }

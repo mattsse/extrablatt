@@ -9,7 +9,7 @@ use std::collections::HashSet;
 lazy_static! {
 
     /// A [`Regex`] to determine whether a `Node`'s attribute should be ignored
-    pub static ref RE_BAD_NODES_ATTR : Regex = Regex::new(r###"(?mi)^side$|combx|retweet|mediaarticlerelated|menucontainer|navbar|storytopbar-bucket|utility-bar|inline-share-tools|comment|PopularQuestions|contact|foot(er|note)?|cnn_strycaptiontxt|cnn_html_slideshow|cnn_strylftcntnt|links|meta$|shoutbox|sponsor|tags|socialnetworking|socialNetworking|cnnStryHghLght|cnn_stryspcvbx|^inset$|pagetools|post-attributes|welcome_form|contentTools2|the_answers|communitypromo|runaroundLeft|subscribe|vcard|articleheadings|date|^print$|popup|author-dropdown|tools|socialtools|byline|konafilter|breadcrumbs|^fn$|wp-caption-text|legende|ajoutVideo|timestamp|js_replies|[^-]facebook(-broadcasting)?|google|[^-]twitter|styln-briefing-block"###).unwrap();
+    pub static ref RE_BAD_NODES_ATTR : Regex = Regex::new(r###"(?mi)^side$|combx|retweet|mediaarticlerelated|menucontainer|navbar|storytopbar-bucket|utility-bar|inline-share-tools|comment|PopularQuestions|contact|foot(er|note)?|cnn_strycaptiontxt|cnn_html_slideshow|cnn_strylftcntnt|links|meta$|shoutbox|sponsor|tags|socialnetworking|socialNetworking|cnnStryHghLght|cnn_stryspcvbx|^inset$|pagetools|post-attributes|welcome_form|contentTools2|the_answers|communitypromo|runaroundLeft|subscribe|vcard|articleheadings|date|^print$|popup|author-dropdown|tools|socialtools|byline|konafilter|breadcrumbs|^fn$|wp-caption-text|legende|ajoutVideo|timestamp|js_replies|[^-]facebook(-broadcasting)?|google|[^-]twitter|styln-briefing-block|read-more-link|js-body-read-more"###).unwrap();
 
 }
 
@@ -20,9 +20,9 @@ const ATTR_TO_CHECK: [&str; 3] = ["id", "class", "name"];
 pub trait DocumentCleaner {
     /// Extract all textual content from the node, but ignore those nodes, that
     /// do not contain parts of the article.
-    fn clean_node_text(&self, node: &Node) -> String {
+    fn clean_node_text(&self, node: Node) -> String {
         fn recur_text<T: DocumentCleaner + ?Sized>(
-            node: &Node,
+            node: Node,
             txt: &mut String,
             cleaner: &T,
         ) -> bool {
@@ -48,7 +48,7 @@ pub trait DocumentCleaner {
                             // escape the content of a `<a>...</a>` tag that is embedded between
                             // text nodes
                             let mut a = String::new();
-                            if recur_text(&child, &mut a, cleaner) {
+                            if recur_text(child, &mut a, cleaner) {
                                 if txt_added {
                                     txt.push(' ');
                                     txt.push_str(&a);
@@ -56,7 +56,7 @@ pub trait DocumentCleaner {
                                 }
                             }
                         } else {
-                            recur_text(&child, txt, cleaner);
+                            recur_text(child, txt, cleaner);
                         }
                     }
                 }
@@ -73,14 +73,19 @@ pub trait DocumentCleaner {
     }
 
     /// Whether the node should be considered
-    fn is_good_node(&self, node: &Node) -> bool {
+    fn is_good_node(&self, node: Node) -> bool {
         !has_bad_attr(node)
     }
 
     /// Whether the node's should be ignored based on its name
-    fn is_bad_node_name(&self, node: &Node) -> bool {
+    fn is_bad_node_name(&self, node: Node) -> bool {
         is_bad_node(node)
     }
+}
+
+pub struct CleanNodeIter<'a, T: DocumentCleaner> {
+    cleaner: &'a T,
+    node: Node<'a>,
 }
 
 /// A standard implementation of a cleaner that only extracts good textual
@@ -94,7 +99,7 @@ impl DocumentCleaner for DefaultDocumentCleaner {}
 #[derive(Debug)]
 pub struct CommonCleaner<P>
 where
-    P: Fn(&Node) -> bool,
+    P: Fn(Node) -> bool,
 {
     /// html tag names that are ignore by default
     pub bad_node_names: HashSet<Cow<'static, str>>,
@@ -104,7 +109,7 @@ where
 
 impl<P> CommonCleaner<P>
 where
-    P: Fn(&Node) -> bool,
+    P: Fn(Node) -> bool,
 {
     /// Create a new Cleaner that ignores [`BAD_TAG_NAMES`] nodes by default and
     /// decides whether to extract text from a node based on the `is_good_node`
@@ -128,7 +133,7 @@ where
     }
 }
 
-impl Default for CommonCleaner<for<'r, 's> fn(&'r Node<'s>) -> bool> {
+impl Default for CommonCleaner<for<'s> fn(Node<'s>) -> bool> {
     fn default() -> Self {
         Self::new(|n| !is_bad_node(n))
     }
@@ -136,14 +141,14 @@ impl Default for CommonCleaner<for<'r, 's> fn(&'r Node<'s>) -> bool> {
 
 impl<P> DocumentCleaner for CommonCleaner<P>
 where
-    P: Fn(&Node) -> bool,
+    P: Fn(Node) -> bool,
 {
-    fn is_good_node(&self, node: &Node) -> bool {
+    fn is_good_node(&self, node: Node) -> bool {
         (self.is_good_node)(node)
     }
 
     /// Whether the node's should be ignored based on its name
-    fn is_bad_node_name(&self, node: &Node) -> bool {
+    fn is_bad_node_name(&self, node: Node) -> bool {
         if let Some(n) = node.name().map(Cow::Borrowed) {
             self.bad_node_names.contains(&n)
         } else {
@@ -152,7 +157,7 @@ where
     }
 }
 
-pub fn is_bad_node(node: &Node) -> bool {
+pub fn is_bad_node(node: Node) -> bool {
     if let Some(n) = node.name() {
         BAD_NODE_NAMES.contains(&n)
     } else {
@@ -160,7 +165,7 @@ pub fn is_bad_node(node: &Node) -> bool {
     }
 }
 
-fn is_para(node: &Node) -> bool {
+fn is_para(node: Node) -> bool {
     if let Some(n) = node.name() {
         let names = &[
             "blockquote",
@@ -181,7 +186,7 @@ fn is_para(node: &Node) -> bool {
 
 /// Ignore nodes that usually do not contain content for the article based on
 /// attributes.
-pub fn has_bad_attr(node: &Node) -> bool {
+pub fn has_bad_attr(node: Node) -> bool {
     for attr in ATTR_TO_CHECK.iter() {
         if let Some(id) = node.attr(attr) {
             if RE_BAD_NODES_ATTR.is_match(id) {
