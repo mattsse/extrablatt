@@ -1,7 +1,5 @@
 use std::borrow::{Borrow, Cow};
-
 use std::hash::{Hash, Hasher};
-
 use std::time::Duration;
 
 use anyhow::{Context, Result};
@@ -13,6 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::date::ArticleDate;
 use crate::error::ExtrablattError;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::extrablatt::Config;
 use crate::extract::{DefaultExtractor, Extractor};
 use crate::language::Language;
@@ -164,12 +163,14 @@ impl Article {
     /// ```no_run
     ///  Article::builder(url)?.get().await?.content
     /// ```
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn content<T: IntoUrl>(url: T) -> Result<ArticleContent<'static>> {
         let article = Self::get(url).await?;
         Ok(article.content)
     }
 
     /// Get the [`Article`] for the `url`
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn get<T: IntoUrl>(url: T) -> Result<Article> {
         Self::builder(url)?.get().await
     }
@@ -177,6 +178,7 @@ impl Article {
     /// Convenience method for creating a new [`ArticleBuilder`]
     ///
     /// Same as calling [`ArticleBuilder::new`]
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn builder<T: IntoUrl>(url: T) -> Result<ArticleBuilder> {
         ArticleBuilder::new(url)
     }
@@ -240,12 +242,14 @@ impl ArticleBuilder {
 
     /// Downloads the article and extract it's content using the
     /// [`extrablatt::DefaultExtractor`].
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn get(self) -> Result<Article> {
         self.get_with_extractor(&DefaultExtractor::default()).await
     }
 
     /// Downloads the article and extracts it's content using the provided
     /// [`extrablatt::Extractor`].
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn get_with_extractor<TExtract: Extractor>(
         self,
         extractor: &TExtract,

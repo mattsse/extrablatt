@@ -1235,20 +1235,3 @@ impl<'a, T: Extractor> DerefMut for ArticleDownloadIter<'a, T> {
         &mut self.inner
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn category_lang_hint() {
-        let category = Category::new(Url::parse("https://arabic.cnn.com/").unwrap());
-        assert_eq!(category.language_hint(), Some(Language::Arabic));
-
-        let category = Category::new(Url::parse("https://cnn.com/Arabic/").unwrap());
-        assert_eq!(category.language_hint(), Some(Language::Arabic));
-
-        let category = Category::new(Url::parse("https://cnn.com/Europe").unwrap());
-        assert_eq!(category.language_hint(), None);
-    }
-}

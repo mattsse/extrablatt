@@ -1,6 +1,11 @@
+#[cfg(not(target_arch = "wasm32"))]
 use crate::error::ExtrablattError;
-use crate::{Article, ArticleStream, DefaultExtractor, Extractor, Language};
+use crate::language::Language;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::{Article, ArticleStream, DefaultExtractor, Extractor};
+#[cfg(not(target_arch = "wasm32"))]
 use anyhow::Result;
+#[cfg(not(target_arch = "wasm32"))]
 use futures::Stream;
 use std::borrow::Borrow;
 use url::Url;
@@ -50,6 +55,7 @@ impl Category {
     /// Fetch all article urls from the page this category's url points to and
     /// return a new stream of articles using the
     /// [`extrablatt::DefaultExtractor`].
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn into_stream(
         self,
     ) -> Result<impl Stream<Item = std::result::Result<Article, ExtrablattError>>> {
@@ -59,6 +65,7 @@ impl Category {
     /// Fetch all article urls from the page this category's url points to and
     /// return a new stream of article using a designated
     /// [`extrablatt::Extractor`].
+    #[cfg(not(target_arch = "wasm32"))]
     pub async fn into_stream_with_extractor<TExtractor: Extractor + Unpin>(
         self,
         extractor: TExtractor,
@@ -70,5 +77,22 @@ impl Category {
 impl Borrow<str> for Category {
     fn borrow(&self) -> &str {
         self.url.as_str()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn category_lang_hint() {
+        let category = Category::new(Url::parse("https://arabic.cnn.com/").unwrap());
+        assert_eq!(category.language_hint(), Some(Language::Arabic));
+
+        let category = Category::new(Url::parse("https://cnn.com/Arabic/").unwrap());
+        assert_eq!(category.language_hint(), Some(Language::Arabic));
+
+        let category = Category::new(Url::parse("https://cnn.com/Europe").unwrap());
+        assert_eq!(category.language_hint(), None);
     }
 }
