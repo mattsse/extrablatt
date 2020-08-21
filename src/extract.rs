@@ -327,7 +327,7 @@ pub trait Extractor {
 
     /// Get the full text of the article.
     fn text<'a>(&self, doc: &'a Document, lang: Language) -> Option<Cow<'a, str>> {
-        self.text_with_cleaner::<DefaultDocumentCleaner>(doc, lang)
+        self.text_with_cleaner(doc, lang, DefaultDocumentCleaner)
     }
 
     /// Get the full text of the article with a designated `DocumentCleaner`
@@ -335,9 +335,10 @@ pub trait Extractor {
         &self,
         doc: &'a Document,
         lang: Language,
+        cleaner: T,
     ) -> Option<Cow<'a, str>> {
         self.text_node(doc, lang)
-            .map(|n| T::clean_node_text(&*n).into())
+            .map(|n| cleaner.clean_node_text(&*n).into())
     }
 
     /// Detect the [`select::Node`] that contains the article's text.
@@ -386,6 +387,7 @@ pub trait Extractor {
     /// Extract all of the images of the document.
     fn image_urls(&self, doc: &Document, base_url: Option<&Url>) -> Vec<Url> {
         let options = Url::options().base_url(base_url);
+        // TODO extract `picture` and source media
         doc.find(Name("img"))
             .filter_map(|n| n.attr("href").map(str::trim))
             .filter_map(|url| options.parse(url).ok())
@@ -562,7 +564,7 @@ pub trait Extractor {
                         .filter_map(|url| url.ok())
                         .collect(),
                 )
-                .text(txt_node.text().into())
+                .text(txt_node.clean_text().into())
                 .images(txt_node.images(base_url));
         }
 

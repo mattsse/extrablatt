@@ -14,13 +14,11 @@ use url::Url;
 pub const PUNCTUATION: &str = r###",."'!?&-/:;()#$%*+<=>@[\]^_`{|}~"###;
 
 pub trait TextContainer<'a> {
-    fn first_text(&self) -> Option<&'a str>;
-
-    // fn text_descendants()
+    fn first_children_text(&self) -> Option<&'a str>;
 }
 
 impl<'a> TextContainer<'a> for Node<'a> {
-    fn first_text(&self) -> Option<&'a str> {
+    fn first_children_text(&self) -> Option<&'a str> {
         self.children().find_map(|n| n.as_text())
     }
 }
@@ -74,7 +72,7 @@ impl<'a> TextNode<'a> {
     /// Extract the content from the node, but ignore those that not contain
     /// parts of the article
     pub fn clean_text(&self) -> String {
-        DefaultDocumentCleaner::clean_node_text(&self.inner)
+        DefaultDocumentCleaner.clean_node_text(&self.inner)
     }
 
     /// Extract all of the images of the document.
@@ -132,7 +130,10 @@ impl TextExtractor {
         let txt_nodes: Vec<_> = TextExtractor::nodes_to_check(doc)
             .filter(|n| !TextExtractor::is_high_link_density(n))
             .filter_map(|node| {
-                if let Some(stats) = node.first_text().and_then(|txt| lang.stopword_count(txt)) {
+                if let Some(stats) = node
+                    .first_children_text()
+                    .and_then(|txt| lang.stopword_count(txt))
+                {
                     if stats.stopword_count > 2 {
                         return Some((node, stats));
                     }
@@ -229,7 +230,7 @@ impl TextExtractor {
                 return false;
             }
             if let Some(stats) = sibling
-                .first_text()
+                .first_children_text()
                 .and_then(|txt| lang.stopword_count(txt))
             {
                 if stats.stopword_count > TextExtractor::MINIMUM_STOPWORD_COUNT {
@@ -244,7 +245,7 @@ impl TextExtractor {
     /// Checks the density of links within a node, if there is a high link to
     /// text ratio, then the text is less likely to be relevant
     fn is_high_link_density(node: &Node) -> bool {
-        let links = node.find(Name("a")).filter_map(|n| n.first_text());
+        let links = node.find(Name("a")).filter_map(|n| n.first_children_text());
 
         if let Some(words) = node.as_text().map(|s| s.split_whitespace()) {
             let words_number = words.count();
@@ -265,7 +266,7 @@ impl TextExtractor {
 
             score >= 1.0
         } else {
-            links.count() != 0
+            links.count() > 0
         }
     }
 
