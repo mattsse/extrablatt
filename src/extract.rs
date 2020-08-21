@@ -22,7 +22,7 @@ use crate::date::{ArticleDate, DateExtractor, RE_DATE_SEGMENTS_M_D_Y, RE_DATE_SE
 
 use crate::extrablatt::Category;
 use crate::stopwords::CATEGORY_STOPWORDS;
-use crate::text::{TextExtractor, TextNode};
+use crate::text::{TextNodeExtractor, TextNode};
 use crate::video::VideoNode;
 use crate::Language;
 
@@ -343,7 +343,7 @@ pub trait Extractor {
 
     /// Detect the [`select::Node`] that contains the article's text.
     fn text_node<'a>(&self, doc: &'a Document, lang: Language) -> Option<TextNode<'a>> {
-        TextExtractor::calculate_best_node(doc, lang)
+        TextNodeExtractor::calculate_best_node(doc, lang)
     }
 
     /// Extract the `href` attribute for all `<a>` tags of the document.

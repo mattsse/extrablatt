@@ -117,9 +117,9 @@ impl<'a> Deref for TextNode<'a> {
     }
 }
 
-pub struct TextExtractor;
+pub struct TextNodeExtractor;
 
-impl TextExtractor {
+impl TextNodeExtractor {
     pub const MINIMUM_STOPWORD_COUNT: usize = 5;
 
     pub const MAX_STEPSAWAY_FROM_NODE: usize = 3;
@@ -127,8 +127,8 @@ impl TextExtractor {
     pub fn calculate_best_node(doc: &Document, lang: Language) -> Option<TextNode> {
         let mut starting_boost = 1.0;
 
-        let txt_nodes: Vec<_> = TextExtractor::nodes_to_check(doc)
-            .filter(|n| !TextExtractor::is_high_link_density(n))
+        let txt_nodes: Vec<_> = TextNodeExtractor::nodes_to_check(doc)
+            .filter(|n| !TextNodeExtractor::is_high_link_density(n))
             .filter_map(|node| {
                 if let Some(stats) = node
                     .first_children_text()
@@ -148,11 +148,10 @@ impl TextExtractor {
         let negative_scoring = 0.0;
         let bottom_negativescore_nodes = nodes_number as f64 * 0.25;
 
-        println!("\n\n");
         for (i, (node, stats)) in txt_nodes.iter().enumerate() {
             let mut boost_score = 0.0;
 
-            if TextExtractor::is_boostable(node, lang.clone()) {
+            if TextNodeExtractor::is_boostable(node, lang.clone()) {
                 boost_score = (1.0 / starting_boost) * 50.0;
                 starting_boost += 1.0;
             }
@@ -226,14 +225,14 @@ impl TextExtractor {
     fn is_boostable(node: &Node, lang: Language) -> bool {
         let mut steps_away = 0;
         while let Some(sibling) = node.prev().filter(|n| n.is(Name("p"))) {
-            if steps_away >= TextExtractor::MAX_STEPSAWAY_FROM_NODE {
+            if steps_away >= TextNodeExtractor::MAX_STEPSAWAY_FROM_NODE {
                 return false;
             }
             if let Some(stats) = sibling
                 .first_children_text()
                 .and_then(|txt| lang.stopword_count(txt))
             {
-                if stats.stopword_count > TextExtractor::MINIMUM_STOPWORD_COUNT {
+                if stats.stopword_count > TextNodeExtractor::MINIMUM_STOPWORD_COUNT {
                     return true;
                 }
             }
