@@ -14,6 +14,7 @@ travis-ci = { repository = "mattsse/extrablatt", branch = "master" }
 
 [[bin]]
 name = "extrablatt"
+path = "src/main.rs"
 required-features = ["cli"]
 
 
@@ -39,9 +40,11 @@ bytes = "0.5"
 futures = "0.3"
 
 [features]
+default = ["stopwords"]
 cli = ["structopt", "serde0", "serde_json"]
 archive = ["archiveis"]
 serde0 = ["serde", "url/serde", "chrono/serde"]
+stopwords = []
 
 [dev-dependencies]
 tokio = { version = "0.2", features = ["macros"] }

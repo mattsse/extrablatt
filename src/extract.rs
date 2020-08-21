@@ -21,7 +21,7 @@ use crate::clean::{DefaultDocumentCleaner, DocumentCleaner};
 use crate::date::{ArticleDate, DateExtractor, RE_DATE_SEGMENTS_M_D_Y, RE_DATE_SEGMENTS_Y_M_D};
 
 use crate::extrablatt::Category;
-use crate::stopwords::CATEGORY_STOPWORDS;
+use crate::nlp::CATEGORY_STOPWORDS;
 use crate::text::{ArticleTextNode, ArticleTextNodeExtractor};
 use crate::video::VideoNode;
 use crate::Language;

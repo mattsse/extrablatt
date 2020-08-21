@@ -4,7 +4,8 @@ use std::str::FromStr;
 #[cfg(feature = "serde0")]
 use serde::{Deserialize, Serialize};
 
-use crate::stopwords::*;
+#[cfg(feature = "stopwords")]
+use crate::nlp::*;
 use crate::text::{ArticleTextNodeExtractor, WordsStats};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -136,6 +137,7 @@ impl Language {
     /// Counts the number of stopwords in the text, if stopwords for that
     /// language are available.
     pub fn stopword_count(&self, txt: &str) -> Option<WordsStats> {
+        #[cfg(feature = "stopwords")]
         if let Some(stopwords) = self.stopwords() {
             let (word_count, stopword_count) = ArticleTextNodeExtractor::words(txt).fold(
                 (0usize, 0usize),
@@ -154,8 +156,18 @@ impl Language {
         } else {
             None
         }
+
+        #[cfg(not(feature = "stopwords"))]
+        {
+            let ctn = ArticleTextNodeExtractor::words(txt).count();
+            Some(WordsStats {
+                word_count: ctn,
+                stopword_count: ctn,
+            })
+        }
     }
 
+    #[cfg(feature = "stopwords")]
     /// Get the stopwords for a language.
     pub fn stopwords(&self) -> Option<&[&str]> {
         match self {
