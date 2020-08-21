@@ -8,11 +8,11 @@ use std::collections::HashSet;
 lazy_static! {
 
     /// A [`Regex`] to determine whether a `Node`'s attribute should be ignored
-    pub static ref RE_BAD_NODES_ATTR : Regex = Regex::new(r###"(?mi)^side$|combx|retweet|mediaarticlerelated|menucontainer|navbar|storytopbar-bucket|utility-bar|inline-share-tools|comment|PopularQuestions|contact|foot(er|note)?|cnn_strycaptiontxt|cnn_html_slideshow|cnn_strylftcntnt|links|meta$|shoutbox|sponsor|tags|socialnetworking|socialNetworking|cnnStryHghLght|cnn_stryspcvbx|^inset$|pagetools|post-attributes|welcome_form|contentTools2|the_answers|communitypromo|runaroundLeft|subscribe|vcard|articleheadings|date|^print$|popup|author-dropdown|tools|socialtools|byline|konafilter|breadcrumbs|^fn$|wp-caption-text|legende|ajoutVideo|timestamp|js_replies|[^-]facebook(-broadcasting)?|google|[^-]twitter"###).unwrap();
+    pub static ref RE_BAD_NODES_ATTR : Regex = Regex::new(r###"(?mi)^side$|combx|retweet|mediaarticlerelated|menucontainer|navbar|storytopbar-bucket|utility-bar|inline-share-tools|comment|PopularQuestions|contact|foot(er|note)?|cnn_strycaptiontxt|cnn_html_slideshow|cnn_strylftcntnt|links|meta$|shoutbox|sponsor|tags|socialnetworking|socialNetworking|cnnStryHghLght|cnn_stryspcvbx|^inset$|pagetools|post-attributes|welcome_form|contentTools2|the_answers|communitypromo|runaroundLeft|subscribe|vcard|articleheadings|date|^print$|popup|author-dropdown|tools|socialtools|byline|konafilter|breadcrumbs|^fn$|wp-caption-text|legende|ajoutVideo|timestamp|js_replies|[^-]facebook(-broadcasting)?|google|[^-]twitter|styln-briefing-block"###).unwrap();
 
 }
 
-pub const BAD_TAG_NAMES: &[&str; 5] = &["script", "style", "figcaption", "figure", "button"];
+pub const BAD_NODE_NAMES: &[&str; 5] = &["script", "style", "figcaption", "figure", "button"];
 
 const ATTR_TO_CHECK: [&str; 3] = ["id", "class", "name"];
 
@@ -20,37 +20,41 @@ pub trait DocumentCleaner {
     /// Extract all textual content from the node, but ignore those nodes, that
     /// do not contain parts of the article.
     fn clean_node_text(&self, node: &Node) -> String {
-        fn recur_text<T: DocumentCleaner + ?Sized>(node: &Node, txt: &mut String) {
-            if is_bad_node(node) {
+        fn recur_text<T: DocumentCleaner + ?Sized>(node: &Node, txt: &mut String, cleaner: &T) {
+            if cleaner.is_bad_node_name(node) {
                 return;
             }
-            if !has_bad_attr(node) {
-                T::node_text(node, txt)
-            }
-            for child in node.children() {
-                recur_text::<T>(&child, txt)
+            if cleaner.is_good_node(node) {
+                let mut txt_added = false;
+                for child in node.children() {
+                    if let Some(txt_fragment) = child.as_text().map(str::trim) {
+                        if !txt_fragment.is_empty() {
+                            txt.push_str(txt_fragment);
+                            txt_added = true
+                        }
+                    } else {
+                        recur_text(&child, txt, cleaner)
+                    }
+                }
+                if txt_added && is_para(node) {
+                    txt.push('\n');
+                }
             }
         }
 
         let mut txt = String::new();
-        recur_text::<Self>(node, &mut txt);
+        recur_text(node, &mut txt, self);
         txt
     }
 
-    /// Extract the valuable textual content from the `node` and put it into
-    /// `txt`
-    fn node_text(node: &Node, txt: &mut String) {
-        for txt_fragment in node
-            .children()
-            .filter_map(|n| n.as_text())
-            .map(str::trim)
-            .filter(|s| !s.is_empty())
-        {
-            txt.push_str(txt_fragment);
-            if is_para(node) {
-                txt.push_str("\n");
-            }
-        }
+    /// Whether the node should be considered
+    fn is_good_node(&self, node: &Node) -> bool {
+        !has_bad_attr(node)
+    }
+
+    /// Whether the node's should be ignored based on its name
+    fn is_bad_node_name(&self, node: &Node) -> bool {
+        is_bad_node(node)
     }
 }
 
@@ -81,7 +85,7 @@ where
     /// decides whether to extract text from a node based on the `is_good_node`
     /// predicate
     pub fn new(is_good_node: P) -> Self {
-        Self::with_names(is_good_node, BAD_TAG_NAMES.iter().cloned())
+        Self::with_names(is_good_node, BAD_NODE_NAMES.iter().cloned())
     }
 
     /// Create a new Cleaner that ignores `bad_names` nodes by default and
@@ -97,22 +101,6 @@ where
             is_good_node,
         }
     }
-
-    fn recur_text(&self, node: &Node, txt: &mut String) {
-        if let Some(n) = node.name() {
-            if self.bad_node_names.contains(&Cow::Borrowed(n)) {
-                return;
-            }
-        }
-
-        if (self.is_good_node)(node) {
-            Self::node_text(node, txt)
-        }
-
-        for child in node.children() {
-            self.recur_text(&child, txt)
-        }
-    }
 }
 
 impl Default for CommonCleaner<for<'r, 's> fn(&'r Node<'s>) -> bool> {
@@ -125,16 +113,23 @@ impl<P> DocumentCleaner for CommonCleaner<P>
 where
     P: Fn(&Node) -> bool,
 {
-    fn clean_node_text(&self, node: &Node) -> String {
-        let mut txt = String::new();
-        self.recur_text(node, &mut txt);
-        txt
+    fn is_good_node(&self, node: &Node) -> bool {
+        (self.is_good_node)(node)
+    }
+
+    /// Whether the node's should be ignored based on its name
+    fn is_bad_node_name(&self, node: &Node) -> bool {
+        if let Some(n) = node.name().map(Cow::Borrowed) {
+            self.bad_node_names.contains(&n)
+        } else {
+            true
+        }
     }
 }
 
 pub fn is_bad_node(node: &Node) -> bool {
     if let Some(n) = node.name() {
-        BAD_TAG_NAMES.contains(&n)
+        BAD_NODE_NAMES.contains(&n)
     } else {
         false
     }
@@ -143,7 +138,6 @@ pub fn is_bad_node(node: &Node) -> bool {
 fn is_para(node: &Node) -> bool {
     if let Some(n) = node.name() {
         let names = &[
-            "a",
             "blockquote",
             "dl",
             "div",
