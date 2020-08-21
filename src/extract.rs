@@ -343,6 +343,13 @@ pub trait Extractor {
 
     /// Detect the [`select::Node`] that contains the article's text.
     fn text_node<'a>(&self, doc: &'a Document, lang: Language) -> Option<TextNode<'a>> {
+        let mut iter =
+            doc.find(Name("body").descendant(TextNodeExtractor::article_body_predicate()));
+        if let Some(node) = iter.next() {
+            if iter.next().is_none() {
+                return Some(TextNode::new(node));
+            }
+        }
         TextNodeExtractor::calculate_best_node(doc, lang)
     }
 

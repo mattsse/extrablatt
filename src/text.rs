@@ -4,12 +4,20 @@ use std::ops::Deref;
 
 use select::document::Document;
 use select::node::Node;
-use select::predicate::{Name, Predicate};
+use select::predicate::{Any, Attr, Name, Predicate};
 
 use crate::clean::{DefaultDocumentCleaner, DocumentCleaner};
 use crate::video::VideoNode;
 use crate::Language;
 use url::Url;
+
+/// Attribute key-value combinations to identify the root node for the textual
+/// content of the article
+pub const ARTICLE_BODY_ATTR: &[(&str, &str); 3] = &[
+    ("itemprop", "articleBody"),
+    ("data-testid", "article-body"),
+    ("name", "articleBody"),
+];
 
 pub const PUNCTUATION: &str = r###",."'!?&-/:;()#$%*+<=>@[\]^_`{|}~"###;
 
@@ -69,6 +77,10 @@ pub struct TextNode<'a> {
 }
 
 impl<'a> TextNode<'a> {
+    pub fn new(inner: Node<'a>) -> Self {
+        Self { inner }
+    }
+
     /// Extract the content from the node, but ignore those that not contain
     /// parts of the article
     pub fn clean_text(&self) -> String {
@@ -123,6 +135,17 @@ impl TextNodeExtractor {
     pub const MINIMUM_STOPWORD_COUNT: usize = 5;
 
     pub const MAX_STEPSAWAY_FROM_NODE: usize = 3;
+
+    pub fn article_body_predicate() -> for<'r, 's> fn(&'r Node<'s>) -> bool {
+        |node| {
+            for (k, v) in ARTICLE_BODY_ATTR.iter().cloned() {
+                if Attr(k, v).matches(node) {
+                    return true;
+                }
+            }
+            false
+        }
+    }
 
     pub fn calculate_best_node(doc: &Document, lang: Language) -> Option<TextNode> {
         let mut starting_boost = 1.0;
@@ -207,9 +230,7 @@ impl TextNodeExtractor {
             }
         }
 
-        index.map(|i| TextNode {
-            inner: Node::new(doc, i).unwrap(),
-        })
+        index.map(|i| TextNode::new(Node::new(doc, i).unwrap()))
     }
 
     /// Returns all nodes we want to search on like paragraphs and tables
