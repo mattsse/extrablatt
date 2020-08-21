@@ -133,7 +133,7 @@ where
     }
 }
 
-fn is_bad_node(node: &Node) -> bool {
+pub fn is_bad_node(node: &Node) -> bool {
     if let Some(n) = node.name() {
         BAD_TAG_NAMES.contains(&n)
     } else {
@@ -163,7 +163,7 @@ fn is_para(node: &Node) -> bool {
 
 /// Ignore nodes that usually do not contain content for the article based on
 /// attributes.
-fn has_bad_attr(node: &Node) -> bool {
+pub fn has_bad_attr(node: &Node) -> bool {
     for attr in ATTR_TO_CHECK.iter() {
         if let Some(id) = node.attr(attr) {
             if RE_BAD_NODES_ATTR.is_match(id) {
