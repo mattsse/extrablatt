@@ -2,6 +2,7 @@ use regex::Regex;
 
 use lazy_static::lazy_static;
 use select::node::Node;
+use select::predicate::{Name, Predicate};
 use std::borrow::Cow;
 use std::collections::HashSet;
 
@@ -20,26 +21,50 @@ pub trait DocumentCleaner {
     /// Extract all textual content from the node, but ignore those nodes, that
     /// do not contain parts of the article.
     fn clean_node_text(&self, node: &Node) -> String {
-        fn recur_text<T: DocumentCleaner + ?Sized>(node: &Node, txt: &mut String, cleaner: &T) {
+        fn recur_text<T: DocumentCleaner + ?Sized>(
+            node: &Node,
+            txt: &mut String,
+            cleaner: &T,
+        ) -> bool {
             if cleaner.is_bad_node_name(node) {
-                return;
+                return false;
             }
+
+            let mut txt_added = false;
             if cleaner.is_good_node(node) {
-                let mut txt_added = false;
+                let mut needs_ws = false;
                 for child in node.children() {
+                    if needs_ws {
+                        txt.push(' ');
+                        needs_ws = false;
+                    }
                     if let Some(txt_fragment) = child.as_text().map(str::trim) {
                         if !txt_fragment.is_empty() {
                             txt.push_str(txt_fragment);
                             txt_added = true
                         }
                     } else {
-                        recur_text(&child, txt, cleaner)
+                        if Name("a").matches(&child) {
+                            // escape the content of a `<a>...</a>` tag that is embedded between
+                            // text nodes
+                            let mut a = String::new();
+                            if recur_text(&child, &mut a, cleaner) {
+                                if txt_added {
+                                    txt.push(' ');
+                                    txt.push_str(&a);
+                                    needs_ws = true;
+                                }
+                            }
+                        } else {
+                            recur_text(&child, txt, cleaner);
+                        }
                     }
                 }
-                if txt_added && is_para(node) {
+                if (txt_added && is_para(node)) || needs_ws {
                     txt.push('\n');
                 }
             }
+            txt_added
         }
 
         let mut txt = String::new();
