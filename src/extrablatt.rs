@@ -24,6 +24,7 @@ use crate::language::Language;
 use crate::text::ArticleTextNodeExtractor;
 use crate::Category;
 
+/// Caches article downloads
 #[derive(Debug)]
 pub struct Extrablatt<TExtractor: Extractor = DefaultExtractor> {
     /// The [`reqwest::Client`] that drives requests.
@@ -118,9 +119,9 @@ impl<TExtractor: Extractor> Extrablatt<TExtractor> {
     /// # use extrablatt::Extrablatt;
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let mut newspaper = Extrablatt::builder("https://cnn.com/")?.build().await?;
-    ///     newspaper.download_all_remaining_categories().await;
-    ///     for(url, content) in newspaper.download_articles().await.successes() {
+    ///     let mut site = Extrablatt::builder("https://cnn.com/")?.build().await?;
+    ///     site.download_all_remaining_categories().await;
+    ///     for(url, content) in site.download_articles().await.successes() {
     ///         // ...
     ///     }
     /// #   Ok(())
@@ -249,6 +250,7 @@ impl<TExtractor: Extractor> Extrablatt<TExtractor> {
         }
     }
 
+    /// Download all categories and extract the article urls
     async fn download_categories(
         &mut self,
         items: Vec<Category>,

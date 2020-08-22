@@ -10,6 +10,7 @@ use futures::Stream;
 use std::borrow::Borrow;
 use url::Url;
 
+/// A category e.g. Politics or sports
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Category {
     /// The address for the category website.
@@ -55,7 +56,6 @@ impl Category {
     /// Fetch all article urls from the page this category's url points to and
     /// return a new stream of articles using the
     /// [`extrablatt::DefaultExtractor`].
-    #[cfg(not(target_arch = "wasm32"))]
     pub async fn into_stream(
         self,
     ) -> Result<impl Stream<Item = std::result::Result<Article, ExtrablattError>>> {
@@ -65,7 +65,6 @@ impl Category {
     /// Fetch all article urls from the page this category's url points to and
     /// return a new stream of article using a designated
     /// [`extrablatt::Extractor`].
-    #[cfg(not(target_arch = "wasm32"))]
     pub async fn into_stream_with_extractor<TExtractor: Extractor + Unpin>(
         self,
         extractor: TExtractor,
