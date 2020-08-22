@@ -156,6 +156,51 @@ pub struct Article {
 }
 
 impl Article {
+    /// Extract the article directly from the doc using the [`DefaultExtractor`]
+    pub fn new<U: IntoUrl, T: AsRef<str>>(url: U, doc: T) -> Result<Article> {
+        Self::with_extractor(url, doc, &DefaultExtractor::default())
+    }
+
+    pub fn with_extractor<U, T, TExtract>(url: U, doc: T, extractor: &TExtract) -> Result<Article>
+    where
+        U: IntoUrl,
+        T: AsRef<str>,
+        TExtract: Extractor,
+    {
+        Self::with_extractor_and_lang(url, doc, extractor, Default::default())
+    }
+
+    /// Extract the article directly from the doc using the provided `extractor`
+    /// and `lang`
+    pub fn with_extractor_and_lang<U, T, TExtract>(
+        url: U,
+        doc: T,
+        extractor: &TExtract,
+        language: Language,
+    ) -> Result<Article>
+    where
+        U: IntoUrl,
+        T: AsRef<str>,
+        TExtract: Extractor,
+    {
+        let url = url.into_url()?;
+        let doc = Document::from(doc.as_ref());
+        let content = extractor
+            .article_content(
+                &doc,
+                extractor.base_url(&doc).as_ref(),
+                Some(language.clone()),
+            )
+            .into_owned();
+
+        Ok(Article {
+            url,
+            doc,
+            content,
+            language,
+        })
+    }
+
     /// Retrieves the [`ArticleContent`] from the `url`
     ///
     /// Convenience method for:
