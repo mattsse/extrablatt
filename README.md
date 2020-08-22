@@ -3,10 +3,12 @@ extrablatt
 [![Crates.io](https://img.shields.io/crates/v/extrablatt.svg)](https://crates.io/crates/extrablatt)
 [![Documentation](https://docs.rs/extrablatt/badge.svg)](https://docs.rs/extrablatt)
 
-Article scraping & curation.
-Inspired by [newspaper](https://github.com/codelucas/newspaper).
+Customizable article scraping & curation library and CLI.
+Also runs in Wasm. Basic Wasm example with some CORS limitations [https://mattsse.github.io/extrablatt/](https://mattsse.github.io/extrablatt/).
 
-Html Scraping via [select.rs]("https://github.com/utkarshkukreti/select.rs").
+
+Inspired by [newspaper](https://github.com/codelucas/newspaper).
+Html Scraping is done via [select.rs]("https://github.com/utkarshkukreti/select.rs").
 
 ## Features
 
@@ -16,8 +18,10 @@ Html Scraping via [select.rs]("https://github.com/utkarshkukreti/select.rs").
 * All image extraction
 * Keyword extraction
 * Author extraction
+* Publishing date
+* References
 
-Customizable for specific news sites via the `Extractor` trait.
+Customizable for specific news sites/layouts via the `Extractor` trait.
 
 ## Documentation
 
@@ -68,7 +72,8 @@ SUBCOMMANDS:
     article     Extract a set of articles
     category    Extract all articles found on the page
     help        Prints this message or the help of the given subcommand(s)
-    paper       Extract all articles from a news source.
+    site        Extract all articles from a news source.
+
 ```
 
 ### Extract a set of specific articles and store the result as json
