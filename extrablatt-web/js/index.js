@@ -37,7 +37,7 @@ async function extract() {
 }
 
 function clearTable() {
-    const table = document.getElementById("extract-table")
+    const table = document.getElementById("extract-tableRoot");
     if (table) {
         table.remove();
     }
@@ -50,7 +50,7 @@ function setError(err, url) {
         }
     }
     const msg = document.createElement("div");
-    msg.setAttribute("id", "extract-table");
+    msg.setAttribute("id", "extract-tableRoot");
     msg.innerHTML = "<h3>" + err + "</h3>";
     msg.innerHTML += "<p>" + url + "</p>"
     return msg;
