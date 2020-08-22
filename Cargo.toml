@@ -59,3 +59,7 @@ wasm-bindgen-test = "0.3"
 
 [workspace]
 members = ["extrablatt-web"]
+
+
+[target.'cfg(target_arch = "wasm32")'.profile.release]
+opt-level = "s"
