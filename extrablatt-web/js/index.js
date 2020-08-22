@@ -15,17 +15,23 @@ function setUrlFromLocation() {
     }
 }
 
+function setLocationFromUrl(url) {
+    let param = "?url=" + encodeURI(url);
+    window.history.pushState({}, url, param);
+}
 
 async function extract() {
     const url = document.getElementById("url-to-extract").value;
+    clearTable();
     if (url) {
-        clearTable();
+        setLocationFromUrl(url)
         try {
             const article = await reqwest_article(url);
             const table = generateTable(url, article);
             document.getElementById("extract-root").appendChild(table);
         } catch (e) {
-            setError(e, url);
+            const msg = setError(e, url);
+            document.getElementById("extract-root").appendChild(msg);
         }
     }
 }
@@ -38,10 +44,16 @@ function clearTable() {
 }
 
 function setError(err, url) {
-    const tableRoot = document.createElement("div");
-    tableRoot.setAttribute("id", "extract-tableRoot");
-    tableRoot.innerHTML = "<h3>" + err + "</h3>";
-    tableRoot.innerHTML += "<p>" + url + "</p>"
+    if (err) {
+        if (err.includes("Failed to fetch")) {
+            err = err + ", Likely blocked by client due to CORS..."
+        }
+    }
+    const msg = document.createElement("div");
+    msg.setAttribute("id", "extract-table");
+    msg.innerHTML = "<h3>" + err + "</h3>";
+    msg.innerHTML += "<p>" + url + "</p>"
+    return msg;
 }
 
 function generateTable(url, article) {
@@ -74,8 +86,6 @@ function generateTable(url, article) {
             updated = updated.DateTime;
         }
     }
-    console.log(JSON.stringify(published));
-    console.log(JSON.stringify(updated));
     createTextValueRow(tBody.insertRow(), "Published", published);
     createTextValueRow(tBody.insertRow(), "Updated", updated);
 
@@ -148,8 +158,6 @@ function createArticleTextRow(row, txt) {
     cell = row.insertCell();
     if (txt) {
         const lines = txt.split(/\n/);
-
-        console.log(lines.length);
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
