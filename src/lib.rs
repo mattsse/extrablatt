@@ -51,7 +51,7 @@
 //!     for(url, content) in site.download_articles().await.successes() {
 //!         // ...
 //!     }
-//! #     Ok(())
+//! #   Ok(())
 //! # }
 //! ```
 //!
@@ -72,7 +72,42 @@
 //!             println!("{:?}", article);
 //!         }
 //!     }
-//! #     Ok(())
+//! #   Ok(())
+//! # }
+//! ```
+//!
+//! By default, extraction of valuable information is done using the
+//! [`extrablatt::DefaultExtractor`] which only uses the default implementation
+//! of the [`extrablatt::Extractor`] trait. To customize the content extraction,
+//! the trait must be implemented for a custom extractor.
+//!
+//! ```no_run
+//! use extrablatt::{Extractor, Language};
+//! use extrablatt::select::{predicate::Attr, document::Document};
+//! use std::borrow::Cow;
+//!
+//! pub struct MyExtractor {
+//!     //...
+//! }
+//!
+//! impl Extractor for MyExtractor {
+//!
+//!     fn text<'a>(&self, doc: &'a Document, lang: Language) -> Option<Cow<'a, str>> {
+//!         // identify and extract the article's text from the `doc`,
+//!         // e.g. by finding the very node that holds the text
+//!         doc.find(Attr("id", "article")).next().map(|n| n.text().into())
+//!     }
+//! }
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     let extractor = MyExtractor{};
+//!     let article = extrablatt::Article::get_with_extractor(
+//!         "http://example.com/interesting-article.html",
+//!         &extractor,
+//!     )
+//!     .await
+//!     .unwrap();
+//! #   Ok(())
 //! # }
 //! ```
 

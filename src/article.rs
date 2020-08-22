@@ -223,6 +223,14 @@ impl Article {
         Self::builder(url)?.get().await
     }
 
+    /// Get the [`Article`] for the `url` using a specific `Extractor`
+    pub async fn get_with_extractor<T: IntoUrl, TExtract: Extractor>(
+        url: T,
+        extractor: &TExtract,
+    ) -> Result<Article> {
+        Self::builder(url)?.get_with_extractor(extractor).await
+    }
+
     /// Convenience method for creating a new [`ArticleBuilder`]
     ///
     /// Same as calling [`ArticleBuilder::new`]
