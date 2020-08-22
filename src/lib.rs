@@ -20,14 +20,15 @@
 //!
 //! ```no_run
 //! use futures::stream::StreamExt;
+//!
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let mut stream = extrablatt::Category::new("https://some-news.com/sports".parse().unwrap())
-//!         .into_stream()
-//!         .await?;
-//!     while let Some(article) = stream.next().await {
-//!         //...
-//!     }
+//! let mut stream = extrablatt::Category::new("https://some-news.com/sports".parse().unwrap())
+//!     .into_stream()
+//!     .await?;
+//! while let Some(article) = stream.next().await {
+//!     //...
+//! }
 //! #     Ok(())
 //! # }
 //! ```
@@ -44,13 +45,14 @@
 //!
 //! ```no_run
 //! use futures::stream::StreamExt;
+//!
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let mut site = extrablatt::Extrablatt::builder("https://some-news.com/")?.build().await?;
-//!     site.download_all_remaining_categories().await;
-//!     for(url, content) in site.download_articles().await.successes() {
-//!         // ...
-//!     }
+//! let mut site = extrablatt::Extrablatt::builder("https://some-news.com/")?.build().await?;
+//! site.download_all_remaining_categories().await;
+//! for(url, content) in site.download_articles().await.successes() {
+//!     // ...
+//! }
 //! #   Ok(())
 //! # }
 //! ```
@@ -60,18 +62,19 @@
 //!
 //! ```no_run
 //! use futures::stream::StreamExt;
+//!
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let site = extrablatt::Extrablatt::builder("https://some-news.com/")?.build().await?;
+//! let site = extrablatt::Extrablatt::builder("https://some-news.com/")?.build().await?;
 //!
-//!     let mut stream = site.into_stream();
-//!     while let Some(article) = stream.next().await {
-//!         if let Ok(article) = article {
-//!             println!("article '{:?}'", article.content.title)
-//!         } else {
-//!             println!("{:?}", article);
-//!         }
+//! let mut stream = site.into_stream();
+//! while let Some(article) = stream.next().await {
+//!     if let Ok(article) = article {
+//!         println!("article '{:?}'", article.content.title)
+//!     } else {
+//!         println!("{:?}", article);
 //!     }
+//! }
 //! #   Ok(())
 //! # }
 //! ```
@@ -100,13 +103,13 @@
 //! }
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let extractor = MyExtractor{};
-//!     let article = extrablatt::Article::get_with_extractor(
-//!         "http://example.com/interesting-article.html",
-//!         &extractor,
-//!     )
-//!     .await
-//!     .unwrap();
+//! let extractor = MyExtractor{};
+//! let article = extrablatt::Article::get_with_extractor(
+//!     "http://example.com/interesting-article.html",
+//!     &extractor,
+//! )
+//! .await
+//! .unwrap();
 //! #   Ok(())
 //! # }
 //! ```
