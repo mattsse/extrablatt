@@ -36,13 +36,14 @@ fnv = "1.0"
 url = "2.1"
 bytes = "0.5"
 futures = "0.3"
+tokio = { version = "0.2", features = ["macros", "fs"], optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 tokio = { version = "0.2", features = ["macros"] }
 
 [features]
 default = ["stopwords"]
-cli = ["structopt", "serde0", "serde_json"]
+cli = ["structopt", "serde0", "serde_json", "tokio"]
 archive = ["archiveis"]
 serde0 = ["serde", "url/serde", "chrono/serde"]
 stopwords = []

@@ -10,10 +10,10 @@ use extrablatt::{Article, Category, Config, Extrablatt};
 #[allow(missing_docs)]
 #[derive(Debug, StructOpt)]
 #[structopt(name = "extrablatt", about = "News article scraping and curation.")]
-#[structopt(raw(setting = "structopt::clap::AppSettings::ColoredHelp"))]
+#[structopt(setting = structopt::clap::AppSettings::ColoredHelp)]
 enum App {
-    #[structopt(name = "paper", about = "Extract all articles from a news source.")]
-    Paper {
+    #[structopt(name = "site", about = "Extract all articles from a news source.")]
+    Site {
         #[structopt(name = "url", help = "The main url of the news outlet.")]
         url: Url,
         #[structopt(flatten)]
@@ -51,7 +51,7 @@ enum App {
 impl App {
     async fn run(self) -> anyhow::Result<()> {
         let (out, articles) = match self {
-            App::Paper { url, opts } => {
+            App::Site { url, opts } => {
                 let config = opts.as_config();
                 (
                     opts.output,
