@@ -1,12 +1,11 @@
 /// Reexported to implement custom extractors.
 pub use select;
 
-pub use article::{Article, PureArticle};
-pub use category::Category;
-#[cfg(not(target_arch = "wasm32"))]
-pub use extrablatt::{ArticleStream, Config, Extrablatt, ExtrablattBuilder};
-pub use extract::{DefaultExtractor, Extractor};
-pub use language::Language;
+pub use crate::article::{Article, PureArticle};
+pub use crate::category::Category;
+pub use crate::extrablatt::{ArticleStream, Config, Extrablatt, ExtrablattBuilder};
+pub use crate::extract::{DefaultExtractor, Extractor};
+pub use crate::language::Language;
 
 pub mod article;
 pub mod category;
