@@ -7,11 +7,11 @@ const dist = path.resolve(__dirname, "dist");
 module.exports = {
   mode: "production",
   entry: {
-    index: "./js/index.js"
+    index: "./js/bootstrap.js"
   },
   output: {
     path: dist,
-    filename: "[name].js"
+    filename: "bootstrap.js"
   },
   devServer: {
     contentBase: dist,

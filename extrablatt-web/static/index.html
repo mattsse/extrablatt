@@ -27,12 +27,12 @@
 <body class="d-flex flex-column h-100">
 <noscript>This page contains webassembly and javascript content, please enable javascript in your browser.</noscript>
 
-<script src="index.js"></script>
+<script src="bootstrap.js"></script>
 
 <!-- Navigation -->
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark static-top">
     <div class="container">
-        <a class="navbar-brand" href="#">extrablatt wasm</a>
+        <a class="navbar-brand" href="#">extrablatt</a>
         <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarResponsive"
                 aria-controls="navbarResponsive" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
@@ -50,17 +50,28 @@
     </div>
 </nav>
 
-
 <!-- Page Content -->
-<main role="main" class="flex-shrink-0">
-    <div class="container">
-        <div class="row">
-            <div class="col-lg-12 text-center">
-                <h2>Extrablatt Demo</h2>
-            </div>
+<div class="container">
+    <div class="row">
+        <div class="col-lg-12 text-center">
+            <h2 class="mt-5 text-center">Extrablatt Wasm Demo</h2>
         </div>
     </div>
-</main>
+    <div class="row justify-content-center">
+        <div class="col-lg-12 col-lg-offset-6">
+            <form>
+                <div class="form-group">
+                    <input style="height: 50px" class="form-control input-lg" type="url" id="url-to-extract"
+                           placeholder="Paste the URL of an article">
+                </div>
+                    <button id="btn-extract" type="submit" style="min-width: 25%" class="btn btn-dark btn-lg mx-auto d-block">Extract</button>
+            </form>
+        </div>
+    </div>
+    <div class="row">
+
+    </div>
+</div>
 
 
 <footer class="footer">
