@@ -4,11 +4,14 @@ extrablatt
 [![Documentation](https://docs.rs/extrablatt/badge.svg)](https://docs.rs/extrablatt)
 
 Customizable article scraping & curation library and CLI.
-Also runs in Wasm. Basic Wasm example with some CORS limitations [https://mattsse.github.io/extrablatt/](https://mattsse.github.io/extrablatt/).
+Also runs in Wasm.
+
+Basic Wasm example with some CORS limitations: [https://mattsse.github.io/extrablatt/](https://mattsse.github.io/extrablatt/)
 
 
 Inspired by [newspaper](https://github.com/codelucas/newspaper).
-Html Scraping is done via [select.rs]("https://github.com/utkarshkukreti/select.rs").
+
+Html Scraping is done via [select.rs](https://github.com/utkarshkukreti/select.rs).
 
 ## Features
 
