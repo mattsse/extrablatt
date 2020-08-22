@@ -8,20 +8,12 @@
 
     <title>extrablatt wasm example</title>
 
+    <link rel="shortcut icon" href="./icons/favicon.ico" type="image/x-icon">
+    <link rel="icon" href="./icons/favicon.ico" type="image/x-icon">
+
     <!-- Bootstrap core CSS -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
           integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
-
-    <style>
-        .footer {
-            position: absolute;
-            bottom: 0;
-            width: 100%;
-            height: 60px;
-            line-height: 60px;
-            background-color: #f5f5f5;
-        }
-    </style>
 
 </head>
 <body class="d-flex flex-column h-100">
@@ -64,21 +56,30 @@
                     <input style="height: 50px" class="form-control input-lg" type="url" id="url-to-extract"
                            placeholder="Paste the URL of an article">
                 </div>
-                    <button id="btn-extract" type="button" style="min-width: 25%" class="btn btn-dark btn-lg mx-auto d-block">Extract</button>
+                <button id="btn-extract" type="button" style="min-width: 25%"
+                        class="btn btn-dark btn-lg mx-auto d-block">Extract
+                </button>
             </form>
         </div>
     </div>
-    <div id="extract-root" class="row">
-
+    <div class="row">
+        <div id="extract-root" class="col-lg-12">
+        </div>
     </div>
+
+    <div class="row">
+        <div class="col-lg-12" style="height: 30px">
+        </div>
+    </div>
+
 </div>
 
 
-<footer class="footer">
+<footer class="navbar fixed-bottom bg-light">
     <div class="container">
-        <div class="row">
-            <div class="col-sm-6 text-center text-sm-left text-muted">© 2020 Matthias Seitz</div>
-            <div class="col-sm-6 text-center text-sm-right">
+        <div class="row" style="width: 100vw">
+            <div class="col-md-6 text-center text-md-left text-muted">© 2020 Matthias Seitz</div>
+            <div class="col-md-6 text-center text-md-right">
                 <a href="https://github.com/mattsse/extrablatt/extrablatt-web/static/index.html">
                     edit this page on github
                 </a>
