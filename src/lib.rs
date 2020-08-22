@@ -5,7 +5,7 @@
 //! supports targeted article scraping and non-targeted gathering of articles
 //! either limited by category or unrestricted for an entire website. Extrablatt
 //! allows for customized extraction of the textual content of an article by
-//! means of the [`extrablatt::extract::Extractor`] trait.
+//! means of the [`crate::extract::Extractor`] trait.
 //!
 //!
 //! # Examples
@@ -16,7 +16,7 @@
 //!  extrablatt::Article::get("http://example.com/interesting-article.html");
 //! ```
 //!
-//! A [`extrablatt::Category`] represents a broader collection of articles, like Sports or Politics. Categores usually have their own designated page, e.g. `https://some-news.com/sports`. By targeting specific [`extrablatt::Category`], Extrablatt tries to identify all news articles on the categorie's page and then scrape them afterwards.
+//! A [`crate::Category`] represents a broader collection of articles, like Sports or Politics. Categores usually have their own designated page, e.g. `https://some-news.com/sports`. By targeting specific [`crate::Category`], Extrablatt tries to identify all news articles on the categorie's page and then scrape them afterwards.
 //!
 //! ```no_run
 //! use futures::stream::StreamExt;
@@ -32,12 +32,12 @@
 //! # }
 //! ```
 //!
-//! The streaming of articles is made possible by [`extrablatt::ArticleStream`],
+//! The streaming of articles is made possible by [`crate::ArticleStream`],
 //! which lets you turn any website into [`futures::stream::Stream`] fo
 //! articles.
 //!
 //!
-//! [`extrablatt::Extrablatt`] is essentially a cache of articles of an entire
+//! [`crate::Extrablatt`] is essentially a cache of articles of an entire
 //! news site. It first tries to identify all categories from the main page and
 //! then download and and scrape every article. Failed downloading attempts can
 //! easily be repeated.
@@ -55,8 +55,8 @@
 //! # }
 //! ```
 //!
-//! However [`extrablatt::Extrablatt`] can also be consumed and turned in to an
-//! [`extrablatt::ArticleStream`] covering the whole site.
+//! However [`crate::Extrablatt`] can also be consumed and turned in to an
+//! [`crate::ArticleStream`] covering the whole site.
 //!
 //! ```no_run
 //! use futures::stream::StreamExt;
@@ -77,8 +77,8 @@
 //! ```
 //!
 //! By default, extraction of valuable information is done using the
-//! [`extrablatt::DefaultExtractor`] which only uses the default implementation
-//! of the [`extrablatt::Extractor`] trait. To customize the content extraction,
+//! [`crate::DefaultExtractor`] which only uses the default implementation
+//! of the [`crate::Extractor`] trait. To customize the content extraction,
 //! the trait must be implemented for a custom extractor.
 //!
 //! ```no_run

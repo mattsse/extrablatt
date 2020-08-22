@@ -35,9 +35,9 @@ pub struct Extrablatt<TExtractor: Extractor = DefaultExtractor> {
     main_page: Document,
     /// Url of the main page.
     base_url: Url,
-    /// The [`extrablatt::Extractor`] used for content retrieval.
+    /// The [`crate::Extractor`] used for content retrieval.
     ///
-    /// Default is [`extrablatt::DefaultExtractor`].
+    /// Default is [`crate::DefaultExtractor`].
     extractor: TExtractor,
     /// Cache for retrieved articles.
     articles: FnvHashMap<ArticleUrl, DocumentDownloadState>,
@@ -368,7 +368,7 @@ impl<TExtractor: Extractor> Extrablatt<TExtractor> {
 
 impl<TExtractor: Extractor + Unpin> Extrablatt<TExtractor> {
     /// Converts the newspaper into a stream, yielding all available
-    /// [`extrablatt::Article`]s.
+    /// [`crate::Article`]s.
     pub fn into_stream(
         mut self,
     ) -> impl Stream<Item = std::result::Result<Article, ExtrablattError>> {
@@ -477,11 +477,11 @@ pub struct ArticleStream<TExtractor: Extractor> {
 impl ArticleStream<DefaultExtractor> {
     /// Fetch all article urls from the page the url points to and
     /// return a new stream of articles using the
-    /// [`extrablatt::DefaultExtractor`].
+    /// [`crate::DefaultExtractor`].
     ///
     /// # Example
     ///
-    /// Create a new [`extrablatt::ArticleStream`] that yields all articles
+    /// Create a new [`crate::ArticleStream`] that yields all articles
     /// referenced on `https:://example.com/some/path`
     ///
     /// ```no_run
@@ -504,7 +504,7 @@ impl ArticleStream<DefaultExtractor> {
 impl<TExtractor: Extractor + Unpin> ArticleStream<TExtractor> {
     /// Fetch all article urls from the page the url points to and
     /// return a new stream of articles using a designated
-    /// [`extrablatt::Extractor`].
+    /// [`crate::Extractor`].
     pub async fn new_with_extractor<T: IntoUrl>(
         url: T,
         extractor: TExtractor,
@@ -802,7 +802,7 @@ pub enum DocumentDownloadState {
         received: Instant,
     },
     /// Received a success response at `received` but failed to parse the `body`
-    /// into a [`select::Document`]
+    /// into a [`select::document::Document`]
     DocumentReadFailure {
         /// Timestamp the response was received.
         received: Instant,
@@ -862,7 +862,7 @@ impl DocumentDownloadState {
     }
 
     /// If the error is due to an non 2xx response, try to read it into an
-    /// [`select::Document`] anyway.
+    /// [`select::document::Document`] anyway.
     async fn advance_non_http_success(
         err: ExtrablattError,
     ) -> std::result::Result<(Document, Instant), ExtrablattError> {

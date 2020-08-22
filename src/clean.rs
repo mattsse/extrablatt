@@ -138,7 +138,7 @@ impl<P> CommonCleaner<P>
 where
     P: Fn(Node) -> bool,
 {
-    /// Create a new Cleaner that ignores [`BAD_TAG_NAMES`] nodes by default and
+    /// Create a new Cleaner that ignores `BAD_TAG_NAMES` nodes by default and
     /// decides whether to extract text from a node based on the `is_good_node`
     /// predicate
     pub fn new(is_good_node: P) -> Self {

@@ -51,7 +51,7 @@ impl Category {
 
     /// Fetch all article urls from the page this category's url points to and
     /// return a new stream of articles using the
-    /// [`extrablatt::DefaultExtractor`].
+    /// [`crate::DefaultExtractor`].
     pub async fn into_stream(
         self,
     ) -> Result<impl Stream<Item = std::result::Result<Article, ExtrablattError>>> {
@@ -60,7 +60,7 @@ impl Category {
 
     /// Fetch all article urls from the page this category's url points to and
     /// return a new stream of article using a designated
-    /// [`extrablatt::Extractor`].
+    /// [`crate::Extractor`].
     pub async fn into_stream_with_extractor<TExtractor: Extractor + Unpin>(
         self,
         extractor: TExtractor,

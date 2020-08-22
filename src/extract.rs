@@ -57,7 +57,8 @@ impl<'a> NodeValueQuery<'a> {
     }
 }
 
-/// Represents `<meta>` [`select::Node`] in a [`select::Document`].
+/// Represents `<meta>` [`select::node::Node`] in a
+/// [`select::document::Document`].
 pub struct MetaNode<'a> {
     inner: Node<'a>,
 }
@@ -116,7 +117,8 @@ impl<'a> Deref for MetaNode<'a> {
     }
 }
 
-/// Used to retrieve all valuable information from a [`select::Document`].
+/// Used to retrieve all valuable information from a
+/// [`select::document::Document`].
 pub trait Extractor {
     /// Extract the article title.
     ///
@@ -341,7 +343,7 @@ pub trait Extractor {
             .map(|n| cleaner.clean_node_text(*n).into())
     }
 
-    /// Detect the [`select::Node`] that contains the article's text.
+    /// Detect the [`select::node::Node`] that contains the article's text.
     ///
     /// If the `doc`'s body contains a node that matches the
     /// [`crate::text::ARTICLE_BODY_ATTR`] attribute selectors, this node will

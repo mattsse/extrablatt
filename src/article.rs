@@ -238,7 +238,7 @@ impl Article {
         ArticleBuilder::new(url)
     }
 
-    /// Drops the article's html [`select::Document`].
+    /// Drops the article's html [`select::document::Document`].
     pub fn drop_document(self) -> PureArticle {
         PureArticle {
             url: self.url,
@@ -248,8 +248,8 @@ impl Article {
     }
 }
 
-/// An [`extrablatt::Article`] without the [`select::Document`], mainly to use
-/// serde.
+/// An [`crate::Article`] without the [`select::document::Document`], mainly to
+/// use serde.
 #[derive(Debug)]
 #[cfg_attr(feature = "serde0", derive(Serialize, Deserialize))]
 pub struct PureArticle {
@@ -296,13 +296,13 @@ impl ArticleBuilder {
     }
 
     /// Downloads the article and extract it's content using the
-    /// [`extrablatt::DefaultExtractor`].
+    /// [`crate::DefaultExtractor`].
     pub async fn get(self) -> Result<Article> {
         self.get_with_extractor(&DefaultExtractor::default()).await
     }
 
     /// Downloads the article and extracts it's content using the provided
-    /// [`extrablatt::Extractor`].
+    /// [`crate::Extractor`].
     pub async fn get_with_extractor<TExtract: Extractor>(
         self,
         extractor: &TExtract,
