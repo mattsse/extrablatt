@@ -85,8 +85,18 @@ jobs:
           export RUST_BACKTRACE=1
           curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
           wasm-pack --version
-      - name: Build and Test
-        run: wasm-pack test --node -- --lib
+
+      - name: Build and Test Wasm
+        run: cd ./extrablatt-web && wasm-pack test --node -- --lib && cd ../
         env:
           RUST_VERSION: stable
           WASM: wasm_simple
+
+      - name: Build assets
+        run: cd ./extrablatt-web && npm install && npm run build && cd ../
+
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./extrablatt-web/dist
