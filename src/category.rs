@@ -1,11 +1,7 @@
-#[cfg(not(target_arch = "wasm32"))]
 use crate::error::ExtrablattError;
 use crate::language::Language;
-#[cfg(not(target_arch = "wasm32"))]
 use crate::{Article, ArticleStream, DefaultExtractor, Extractor};
-#[cfg(not(target_arch = "wasm32"))]
 use anyhow::Result;
-#[cfg(not(target_arch = "wasm32"))]
 use futures::Stream;
 use std::borrow::Borrow;
 use url::Url;
