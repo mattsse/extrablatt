@@ -339,7 +339,7 @@ impl ArticleBuilder {
             // let msg = format!("Unsuccessful request to {:?}", resp.url());
             // return ExtrablattError::NoHttpSuccessResponse { response: resp
             // }.context(msg);
-            return Err(anyhow::anyhow!("Unsuccessful request to {:?}", resp.url()).into());
+            return Err(anyhow::anyhow!("Unsuccessful request to {:?}", resp.url()));
         }
 
         let url = resp.url().to_owned();

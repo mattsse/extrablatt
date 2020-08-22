@@ -43,21 +43,17 @@ pub trait DocumentCleaner {
                             txt.push_str(txt_fragment);
                             txt_added = true
                         }
-                    } else {
-                        if Name("a").matches(&child) {
-                            // escape the content of a `<a>...</a>` tag that is embedded between
-                            // text nodes
-                            let mut a = String::new();
-                            if recur_text(child, &mut a, cleaner) {
-                                if txt_added {
-                                    txt.push(' ');
-                                    txt.push_str(&a);
-                                    needs_ws = true;
-                                }
-                            }
-                        } else {
-                            recur_text(child, txt, cleaner);
+                    } else if Name("a").matches(&child) {
+                        // escape the content of a `<a>...</a>` tag that is embedded between
+                        // text nodes
+                        let mut a = String::new();
+                        if recur_text(child, &mut a, cleaner) && txt_added {
+                            txt.push(' ');
+                            txt.push_str(&a);
+                            needs_ws = true;
                         }
+                    } else {
+                        recur_text(child, txt, cleaner);
                     }
                 }
                 if (txt_added && is_para(node)) || needs_ws {
@@ -108,8 +104,7 @@ impl<'a, T: DocumentCleaner> Iterator for CleanNodeIter<'a, T> {
         let node = self.inner.next()?;
         if self.cleaner.is_bad_node_name(node) || !self.cleaner.is_good_node(node) {
             // skip every node under this bad node
-            let mut iter = node.descendants();
-            while let Some(ignore) = iter.next() {
+            for ignore in node.descendants() {
                 let next = self.inner.next()?;
                 if ignore.index() != next.index() {
                     return Some(next);
