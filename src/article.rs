@@ -135,11 +135,11 @@ impl Borrow<Url> for ArticleUrl {
 ///
 /// Download a single article directly
 ///
-/// ```edition2018
+/// ```no_run
 /// # use extrablatt::Article;
 /// # #[tokio::main]
 /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     let article = Article::builder("https:://example.com/some/article.html")?.get()?;
+///     let article = Article::builder("http://example.com/")?.get().await?;
 /// #   Ok(())
 /// # }
 /// ```
@@ -206,7 +206,12 @@ impl Article {
     /// Convenience method for:
     ///
     /// ```no_run
-    ///  Article::builder(url)?.get().await?.content
+    ///  # use extrablatt::Article;
+    ///  # #[tokio::main]
+    ///  # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///        let content = Article::builder("http://example.com")?.get().await?.content;
+    ///  #     Ok(())
+    ///  # }
     /// ```
     pub async fn content<T: IntoUrl>(url: T) -> Result<ArticleContent<'static>> {
         let article = Self::get(url).await?;
