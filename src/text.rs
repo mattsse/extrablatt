@@ -320,13 +320,13 @@ pub fn author_text(node: Node) -> String {
         return node
             .attr("content")
             .map(str::to_string)
-            .unwrap_or_else(|| String::new());
+            .unwrap_or_else(String::new);
     }
 
     let mut string = node
         .as_text()
         .map(str::to_string)
-        .unwrap_or_else(|| String::new());
+        .unwrap_or_else(String::new);
     let mut descendants = node.descendants();
     let hidden = Class("hidden");
 
