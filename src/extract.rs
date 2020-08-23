@@ -161,7 +161,14 @@ pub trait Extractor {
         // look for author data in attributes
         let mut authors = HashSet::new();
         for &key in &["name", "rel", "itemprop", "class", "id"] {
-            for &value in &["author", "byline", "dc.creator", "byl"] {
+            for &value in &[
+                "author",
+                "byline",
+                "dc.creator",
+                "byl",
+                "author-names",
+                "authors",
+            ] {
                 for node in doc.find(Attr(key, value)) {
                     let txt = node.text();
                     let t = txt.trim();
