@@ -5,7 +5,7 @@ use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
 use regex::Regex;
 use select::document::Document;
 
-use select::predicate::{Attr, Name, Predicate};
+use select::predicate::{Attr, Name, Predicate, Text};
 #[cfg(feature = "serde0")]
 use serde::{Deserialize, Serialize};
 
@@ -25,7 +25,7 @@ lazy_static! {
 
     /// Common nodes that hold the article's modification date.
     pub(crate) static ref  MODIFIED_DATE_NODES: Vec<NodeValueQuery<'static>> = {
-            let mut nodes = Vec::with_capacity(7);
+            let mut nodes = Vec::with_capacity(8);
             nodes.push(NodeValueQuery::new( Name("meta"), Attr("property",  "article:modified"),
              "content"));
             nodes.push(NodeValueQuery::new( Name("meta"), Attr("property",  "modified"),
@@ -39,6 +39,8 @@ lazy_static! {
             nodes.push(NodeValueQuery::new( Name("meta"), Attr("itemprop",  "dateModified"),
              "datetime"));
             nodes.push(NodeValueQuery::new( Name("meta"), Attr("name",  "dateModified"),
+             "content"));
+            nodes.push(NodeValueQuery::new( Name("meta"), Attr("name",  "last_updated_date"),
              "content"));
              nodes
         };
@@ -73,10 +75,8 @@ lazy_static! {
              "datetime"));
             nodes.push(NodeValueQuery::new( Name("meta"), Attr("name",  "publish_date"),
              "content"));
-
             nodes.push(NodeValueQuery::new( Name("div"), Attr("id",  "taboola-feed-below-article"),
              "data-publishdate"));
-
              nodes
         };
 }
@@ -140,37 +140,31 @@ impl DateExtractor {
         nodes: &[NodeValueQuery<'a>],
         regex: &Regex,
     ) -> Option<NaiveDateTime> {
-        let mut date = {
-            for node in nodes {
-                if let Some(content) = doc
-                    .find(node.name.and(node.attr))
-                    .filter_map(|n| n.attr(node.content_name))
-                    .next()
-                {
-                    if let Some(date) = DateExtractor::fuzzy_dtparse(content) {
-                        return Some(date);
-                    }
-                }
-            }
-            None
-        };
-
-        if date.is_none() {
-            // look for a "publicationDate":"2019..." in the doc str
-            if let Some(head) = doc
-                .find(Name("head"))
-                .filter_map(|head| head.as_text())
+        for node in nodes {
+            if let Some(content) = doc
+                .find(node.name.and(node.attr))
+                .filter_map(|n| n.attr(node.content_name))
                 .next()
             {
-                if let Some(capture) = regex.captures(head) {
-                    date = capture
-                        .name("date")
-                        .and_then(|m| DateExtractor::fuzzy_dtparse(m.as_str()))
+                if let Some(date) = DateExtractor::fuzzy_dtparse(content) {
+                    return Some(date);
                 }
             }
         }
 
-        date
+        // look for a "publicationDate":"2019..." json value embedded in <script> tags
+        doc.find(Name("script").descendant(Text))
+            .filter_map(|script| script.as_text())
+            .filter_map(|script| {
+                if let Some(capture) = regex.captures(script) {
+                    capture
+                        .name("date")
+                        .and_then(|m| DateExtractor::fuzzy_dtparse(m.as_str()))
+                } else {
+                    None
+                }
+            })
+            .next()
     }
 
     fn fuzzy_dtparse(s: &str) -> Option<NaiveDateTime> {
