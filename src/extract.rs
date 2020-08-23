@@ -258,7 +258,12 @@ pub trait Extractor {
         attr: Attr<&'b str, &'b str>,
     ) -> Option<Cow<'a, str>> {
         doc.find(Name("head").descendant(Name("meta").and(attr)))
-            .filter_map(|node| node.attr("content").map(str::trim).map(Cow::Borrowed))
+            .filter_map(|node| {
+                node.attr("content")
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(Cow::Borrowed)
+            })
             .next()
     }
 
