@@ -4,7 +4,7 @@ use std::ops::Deref;
 
 use select::document::Document;
 use select::node::Node;
-use select::predicate::{Attr, Name, Predicate};
+use select::predicate::{Attr, Class, Name, Predicate};
 
 use crate::clean::{DefaultDocumentCleaner, DocumentCleaner};
 use crate::video::VideoNode;
@@ -312,6 +312,40 @@ impl ArticleTextNodeExtractor {
 /// Whether the char is a punctuation.
 pub fn is_punctuation(c: char) -> bool {
     PUNCTUATION.contains(c)
+}
+
+/// Extracts the name valuable author text and ignores hidden content
+pub fn author_text(node: Node) -> String {
+    if Name("meta").matches(&node) {
+        return node
+            .attr("content")
+            .map(str::to_string)
+            .unwrap_or_else(|| String::new());
+    }
+
+    let mut string = node
+        .as_text()
+        .map(str::to_string)
+        .unwrap_or_else(|| String::new());
+    let mut descendants = node.descendants();
+    let hidden = Class("hidden");
+
+    'outer: while let Some(child) = descendants.next() {
+        if hidden.matches(&child) {
+            // skip every node under this bad node
+            for ignore in child.descendants() {
+                if let Some(next) = descendants.next() {
+                    if ignore.index() != next.index() {
+                        continue 'outer;
+                    }
+                }
+            }
+        }
+        if let Some(txt) = child.as_text() {
+            string.push_str(txt)
+        }
+    }
+    string
 }
 
 /// Statistic about words for a text.

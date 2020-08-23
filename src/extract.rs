@@ -9,7 +9,7 @@ use regex::Regex;
 use reqwest::Url;
 use select::document::Document;
 use select::node::Node;
-use select::predicate::{Attr, Name, Predicate};
+use select::predicate::{Attr, Class, Name, Predicate};
 use url::Host;
 
 use lazy_static::lazy_static;
@@ -22,7 +22,7 @@ use crate::date::{ArticleDate, DateExtractor, RE_DATE_SEGMENTS_M_D_Y, RE_DATE_SE
 
 use crate::category::Category;
 use crate::nlp::CATEGORY_STOPWORDS;
-use crate::text::{ArticleTextNode, ArticleTextNodeExtractor};
+use crate::text::{author_text, ArticleTextNode, ArticleTextNodeExtractor};
 use crate::video::VideoNode;
 use crate::Language;
 
@@ -160,17 +160,10 @@ pub trait Extractor {
     fn authors<'a>(&self, doc: &'a Document) -> Vec<Cow<'a, str>> {
         // look for author data in attributes
         let mut authors = HashSet::new();
-        for &key in &["name", "rel", "itemprop", "class", "id"] {
-            for &value in &[
-                "author",
-                "byline",
-                "dc.creator",
-                "byl",
-                "author-names",
-                "authors",
-            ] {
-                for node in doc.find(Attr(key, value)) {
-                    let txt = node.text();
+        for &key in &["name", "rel", "itemprop", "id"] {
+            for &value in &["author", "byline", "dc.creator", "byl"] {
+                for node in doc.find(Attr(key, value).or(Class(value))) {
+                    let txt = author_text(node);
                     let t = txt.trim();
                     if t.is_empty() {
                         continue;
@@ -185,6 +178,7 @@ pub trait Extractor {
                 }
             }
         }
+
         authors.into_iter().map(Cow::Owned).collect()
     }
 
