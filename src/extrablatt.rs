@@ -2,27 +2,26 @@ use std::ops::{Deref, DerefMut};
 use std::pin::Pin;
 use std::time::Duration;
 
+use anyhow::{anyhow, Context, Result};
 use bytes::Bytes;
 use fnv::FnvHashMap;
+use futures::{Future, FutureExt, StreamExt, TryFutureExt};
 use futures::stream::{self, Stream};
 use futures::task::Poll;
-use futures::{Future, FutureExt, StreamExt, TryFutureExt};
+use reqwest::{Client, IntoUrl, Url};
 use reqwest::header::HeaderMap;
 #[cfg(not(target_arch = "wasm32"))]
 use reqwest::header::USER_AGENT;
 use reqwest::Response;
-use reqwest::{Client, IntoUrl, Url};
 use select::document::Document;
 use wasm_timer::Instant;
 
-use anyhow::{anyhow, Context, Result};
-
 use crate::article::{Article, ArticleContent, ArticleUrl, PureArticle};
+use crate::Category;
 use crate::error::ExtrablattError;
 use crate::extract::{DefaultExtractor, Extractor};
 use crate::language::Language;
 use crate::text::ArticleTextNodeExtractor;
-use crate::Category;
 
 /// Caches article downloads
 #[derive(Debug)]
@@ -144,9 +143,9 @@ impl<TExtractor: Extractor> Extrablatt<TExtractor> {
                     })
                 }),
         )
-        .buffer_unordered(10)
-        .collect::<Vec<_>>()
-        .await;
+            .buffer_unordered(10)
+            .collect::<Vec<_>>()
+            .await;
 
         for (url, doc) in results {
             let state = match doc {
@@ -154,7 +153,7 @@ impl<TExtractor: Extractor> Extrablatt<TExtractor> {
                 Err((state, err)) => {
                     if !self.config.http_success_only {
                         if let Ok((doc, received)) =
-                            DocumentDownloadState::advance_non_http_success(err).await
+                        DocumentDownloadState::advance_non_http_success(err).await
                         {
                             DocumentDownloadState::Success { doc, received }
                         } else {
@@ -261,9 +260,9 @@ impl<TExtractor: Extractor> Extrablatt<TExtractor> {
                 .send()
                 .then(|res| async { (cat, DocumentDownloadState::from_response(res).await) })
         }))
-        .buffer_unordered(10)
-        .collect::<Vec<_>>()
-        .await;
+            .buffer_unordered(10)
+            .collect::<Vec<_>>()
+            .await;
         let mut results = Vec::with_capacity(requests.len());
 
         for (cat, res) in requests {
@@ -371,7 +370,7 @@ impl<TExtractor: Extractor + Unpin> Extrablatt<TExtractor> {
     /// [`crate::Article`]s.
     pub fn into_stream(
         mut self,
-    ) -> impl Stream<Item = std::result::Result<Article, ExtrablattError>> {
+    ) -> impl Stream<Item=std::result::Result<Article, ExtrablattError>> {
         let mut articles = Vec::new();
         let mut article_responses = Vec::new();
 
@@ -454,7 +453,7 @@ impl<TExtractor: Extractor + Unpin> Extrablatt<TExtractor> {
 }
 
 type PaperResponse =
-    Pin<Box<dyn Future<Output = std::result::Result<(Url, Bytes), ExtrablattError>>>>;
+Pin<Box<dyn Future<Output=std::result::Result<(Url, Bytes), ExtrablattError>>>>;
 
 type ReadyResponse = (usize, std::result::Result<(Url, Bytes), ExtrablattError>);
 
@@ -486,7 +485,7 @@ impl ArticleStream<DefaultExtractor> {
     ///
     /// ```no_run
     /// # use extrablatt::ArticleStream;
-    /// # use tokio::stream::StreamExt;
+    /// # use futures::stream::{self, StreamExt};
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let mut stream = ArticleStream::new("https:://example.com/some/path").await?;
@@ -724,10 +723,10 @@ impl ExtrablattBuilder {
 
         // TODO headers currently not supported in reqwest wasm
         #[cfg(target_arch = "wasm32")]
-        let client = { Client::builder().build()? };
+            let client = { Client::builder().build()? };
 
         #[cfg(not(target_arch = "wasm32"))]
-        let client = {
+            let client = {
             let mut headers = self.headers.unwrap_or_else(|| HeaderMap::with_capacity(1));
 
             if !headers.contains_key(USER_AGENT) {
@@ -1221,7 +1220,7 @@ pub struct ArticleDownloadIter<'a, T: Extractor> {
 
 impl<'a, T: Extractor> ArticleDownloadIter<'a, T> {
     /// All successfully retrieved Articles.
-    pub fn successes(self) -> impl Iterator<Item = (&'a ArticleUrl, ArticleContent<'a>)> + 'a {
+    pub fn successes(self) -> impl Iterator<Item=(&'a ArticleUrl, ArticleContent<'a>)> + 'a {
         let extractor = self.extractor;
         let language = self.language;
         let base_url = self.base_url;
